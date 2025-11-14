@@ -1,7 +1,12 @@
+//database connection
 <?php
-// Database connection
-$host = 'localhost';
-$dbname = 'sb_db';
-$username = '';
-$password = '';
+$host = "localhost";
+$user = "root";
+$pass = "";
+$dbname = "sbonline";
+
+$conn = new mysqli($host, $user, $pass, $dbname);
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
 ?>

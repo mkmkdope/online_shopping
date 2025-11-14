@@ -1,6 +1,6 @@
 <?php
 session_start();
-include 'db.php';
+include '../sb_base.php';
 
 $userId = 1; // can set who login
 
