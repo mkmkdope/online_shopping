@@ -30,26 +30,42 @@ try {
 
     // Handle CRUD operations
     switch ($action) {
-        case 'create':
-            $product = $_POST;
-            if (validateProduct($product)) {
-                $sql = "INSERT INTO products (title, author, price, description, publisher, publication_date, pages, cover_image, stock_quantity) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+case 'create':
+    $product = $_POST;
+    if (validateProduct($product)) {
+        $sql = "INSERT INTO products (title, author, price, description, publisher, publication_date, pages, cover_image, stock_quantity) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            $product['title'],
+            $product['author'],
+            $product['price'],
+            $product['description'],
+            $product['publisher'],
+            $product['publication_date'],
+            $product['pages'] ?: null,
+            $product['cover_image'], // This will now be the selected filename
+            $product['stock_quantity']
+        ]);
+        
+        $productId = $pdo->lastInsertId();
+        
+        // Handle multiple image uploads
+        $uploadedFiles = handleMultipleFileUploads($productId);
+        
+        // Save additional images to product_images table (if you create it)
+        if (!empty($uploadedFiles)) {
+            foreach ($uploadedFiles as $filename) {
+                $sql = "INSERT INTO product_images (product_id, image_path) VALUES (?, ?)";
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([
-                    $product['title'],
-                    $product['author'],
-                    $product['price'],
-                    $product['description'],
-                    $product['publisher'],
-                    $product['publication_date'],
-                    $product['pages'] ?: null,
-                    $product['cover_image'],
-                    $product['stock_quantity']
-                ]);
-                $message = "Product created successfully!";
+                $stmt->execute([$productId, $filename]);
             }
-            break;
+        }
+        
+        $message = "Product created successfully!" . 
+                  (count($uploadedFiles) ? " Uploaded " . count($uploadedFiles) . " images." : "");
+    }
+    break;
 
         case 'update':
             $product = $_POST;
@@ -108,6 +124,44 @@ try {
 
 } catch (PDOException $e) {
     $error = "Database error: " . $e->getMessage();
+}
+
+// Add this after your existing database connection code
+function handleMultipleFileUploads($productId) {
+    $uploadedFiles = [];
+    
+    if (!empty($_FILES['product_images']['name'][0])) {
+        // Create uploads directory if it doesn't exist
+        $uploadDir = 'uploads/products/';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+        
+        // Process each uploaded file
+        foreach ($_FILES['product_images']['name'] as $key => $name) {
+            if ($_FILES['product_images']['error'][$key] === UPLOAD_ERR_OK) {
+                $fileTmpName = $_FILES['product_images']['tmp_name'][$key];
+                $fileSize = $_FILES['product_images']['size'][$key];
+                $fileType = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                
+                // Validate file
+                $allowedTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                $maxFileSize = 5 * 1024 * 1024; // 5MB
+                
+                if (in_array($fileType, $allowedTypes) && $fileSize <= $maxFileSize) {
+                    // Create unique filename: productID_random_filename.jpg
+                    $safeName = preg_replace('/[^a-zA-Z0-9\._-]/', '_', $name);
+                    $fileName = $productId . '_' . uniqid() . '_' . $safeName;
+                    $uploadFile = $uploadDir . $fileName;
+                    
+                    if (move_uploaded_file($fileTmpName, $uploadFile)) {
+                        $uploadedFiles[] = $fileName;
+                    }
+                }
+            }
+        }
+    }
+    return $uploadedFiles;
 }
 
 // Validation function
@@ -258,12 +312,26 @@ function handleFileUpload() {
                            value="<?php echo htmlspecialchars($product['pages']); ?>">
                 </div>
 
-                <div class="form-group">
-                    <label for="cover_image">Cover Image URL</label>
-                    <input type="text" id="cover_image" name="cover_image" 
-                           value="<?php echo htmlspecialchars($product['cover_image']); ?>">
-                </div>
+<div class="form-group">
+    <label for="cover_image">Cover Image (Select from uploads below)</label>
+    <select id="cover_image" name="cover_image">
+        <option value="">-- Select Main Cover Image --</option>
+        <!-- This will be populated with uploaded images -->
+    </select>
+</div>
 
+<div class="form-group">
+    <label for="product_images">Upload Product Images from Your Computer</label>
+    <input type="file" id="product_images" name="product_images[]" 
+           multiple accept="image/jpeg, image/png, image/gif, image/webp">
+    <small>Click to select cat.jpg, dog.jpg, etc. from your computer (select multiple with Ctrl+Click)</small>
+</div>
+
+<!-- Preview area for selected images -->
+<div id="image-preview" style="margin-top: 10px; display: none;">
+    <h4>Selected Images:</h4>
+    <div id="preview-container"></div>
+</div>
                 <!-- Uncomment for file upload -->
                 <!--
                 <div class="form-group">
@@ -331,6 +399,61 @@ function handleFileUpload() {
             <?php endif; ?>
         </div>
     </div>
+
+    <script>
+
+     
+document.getElementById('product_images').addEventListener('change', function(e) {
+    const previewContainer = document.getElementById('preview-container');
+    const imagePreview = document.getElementById('image-preview');
+    const coverSelect = document.getElementById('cover_image');
+    
+    previewContainer.innerHTML = '';
+    coverSelect.innerHTML = '<option value="">-- Select Main Cover Image --</option>';
+    
+    if (this.files.length > 0) {
+        imagePreview.style.display = 'block';
+        
+        for (let i = 0; i < this.files.length; i++) {
+            const file = this.files[i];
+            
+            // Add to cover image dropdown
+            const option = document.createElement('option');
+            option.value = file.name;
+            option.textContent = file.name;
+            coverSelect.appendChild(option);
+            
+            // Create preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const previewDiv = document.createElement('div');
+                previewDiv.style.display = 'inline-block';
+                previewDiv.style.margin = '5px';
+                previewDiv.style.textAlign = 'center';
+                
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.style.maxWidth = '100px';
+                img.style.maxHeight = '100px';
+                img.style.border = '1px solid #ddd';
+                img.style.margin = '5px';
+                
+                const fileName = document.createElement('div');
+                fileName.textContent = file.name;
+                fileName.style.fontSize = '12px';
+                
+                previewDiv.appendChild(img);
+                previewDiv.appendChild(fileName);
+                previewContainer.appendChild(previewDiv);
+            }
+            reader.readAsDataURL(file);
+        }
+    } else {
+        imagePreview.style.display = 'none';
+    }
+});
+</script>
+
 </body>
 </html>
 <?php
