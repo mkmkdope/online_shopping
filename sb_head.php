@@ -14,9 +14,8 @@
             <ul>
                 <li><a href="/index.php">Home</a></li>
                 <li><a href="/page/product.php">Books</a></li>
-                <li><a href="#">Categories</a></li>
-                <li><a href="#">About</a></li>
-                <li><a href="#">Contact</a></li>
+                <li><a href="/page/category.php">Categories</a></li>
+                <li><a href="/page/about.php">About</a></li>
                 <li><a href="/page/adminProduct.php">temp-product management</a></li>
             </ul>
         </nav>

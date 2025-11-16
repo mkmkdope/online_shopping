@@ -7,49 +7,78 @@ $password = '';
 
 // Initialize variables at the top
 $searchQuery = '';
+$categoryFilter = '';
 $searchResults = [];
 $totalResults = 0;
+$categories = [];
 
 try {
     // Create PDO connection
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     
+    // Fetch all categories for filter dropdown
+    $categoriesSql = "SELECT id, name FROM categories ORDER BY sort_order, name";
+    $categoriesStmt = $pdo->prepare($categoriesSql);
+    $categoriesStmt->execute();
+    $categories = $categoriesStmt->fetchAll(PDO::FETCH_ASSOC);
+    
     // Check if search query exists
-    if (isset($_GET['search']) && !empty(trim($_GET['search']))) {
-        $searchQuery = trim($_GET['search']);
+    $searchQuery = isset($_GET['search']) ? trim($_GET['search']) : '';
+    $categoryFilter = isset($_GET['category']) ? trim($_GET['category']) : '';
+    
+    // Build the base query with category join
+    $sql = "SELECT p.*, c.name as category_name 
+            FROM products p 
+            LEFT JOIN categories c ON p.category_id = c.id 
+            WHERE 1=1";
+    
+    $params = [];
+    $paramTypes = [];
+    
+    // Add search conditions
+    if (!empty($searchQuery)) {
         $searchParam = '%' . $searchQuery . '%';
-        
-        // Enhanced search query
-        $sql = "SELECT * FROM products 
-                WHERE title LIKE :search 
-                   OR author LIKE :search 
-                   OR publisher LIKE :search 
-                   OR description LIKE :search 
-                ORDER BY 
+        $sql .= " AND (p.title LIKE :search 
+                   OR p.author LIKE :search 
+                   OR p.publisher LIKE :search 
+                   OR p.description LIKE :search)";
+        $params[':search'] = $searchParam;
+        $paramTypes[':search'] = PDO::PARAM_STR;
+    }
+    
+    // Add category filter
+    if (!empty($categoryFilter) && is_numeric($categoryFilter)) {
+        $sql .= " AND p.category_id = :category_id";
+        $params[':category_id'] = $categoryFilter;
+        $paramTypes[':category_id'] = PDO::PARAM_INT;
+    }
+    
+    // Add ordering
+    if (!empty($searchQuery)) {
+        $sql .= " ORDER BY 
                     CASE 
-                        WHEN title LIKE :search THEN 1 
-                        WHEN author LIKE :search THEN 2 
-                        WHEN publisher LIKE :search THEN 3 
+                        WHEN p.title LIKE :search THEN 1 
+                        WHEN p.author LIKE :search THEN 2 
+                        WHEN p.publisher LIKE :search THEN 3 
                         ELSE 4 
                     END,
-                    created_at DESC";
-        
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':search', $searchParam, PDO::PARAM_STR);
-        $stmt->execute();
-        
-        $searchResults = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $totalResults = count($searchResults);
-        
+                    p.created_at DESC";
     } else {
-        // Query to fetch all products if no search
-        $sql = "SELECT * FROM products ORDER BY created_at DESC";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute();
-        $searchResults = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $totalResults = count($searchResults);
+        $sql .= " ORDER BY p.created_at DESC";
     }
+    
+    $stmt = $pdo->prepare($sql);
+    
+    // Bind parameters
+    foreach ($params as $key => $value) {
+        $stmt->bindValue($key, $value, $paramTypes[$key]);
+    }
+    
+    $stmt->execute();
+    
+    $searchResults = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $totalResults = count($searchResults);
     
 } catch (PDOException $e) {
     die("Connection failed: " . $e->getMessage());
@@ -65,226 +94,110 @@ include '../sb_head.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Book Shop - <?php echo $searchQuery ? 'Search Results' : 'All Books'; ?></title>
+    <link rel="stylesheet" href="/css/product.css">
     <style>
-        .search-container {
+        .filter-container {
             margin: 20px 0;
-            padding: 25px;
+            padding: 15px;
             background: #f8f9fa;
-            border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
         }
         
-        .search-form {
+        .filter-form {
             display: flex;
-            gap: 12px;
-            max-width: 600px;
-            margin: 0 auto;
+            gap: 15px;
+            align-items: end;
+            flex-wrap: wrap;
         }
         
-        .search-input {
+        .filter-group {
             flex: 1;
-            padding: 12px 15px;
-            border: 2px solid #dee2e6;
-            border-radius: 6px;
-            font-size: 16px;
-            transition: border-color 0.3s;
+            min-width: 200px;
         }
         
-        .search-input:focus {
-            outline: none;
-            border-color: #007bff;
-            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        .filter-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #495057;
         }
         
-        .search-button {
-            padding: 12px 25px;
-            background: #007bff;
+        .filter-select, .search-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .filter-button {
+            background: #6c757d;
             color: white;
             border: none;
-            border-radius: 6px;
+            padding: 10px 20px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 16px;
-            transition: background 0.3s;
+            font-size: 14px;
         }
         
-        .search-button:hover {
-            background: #0056b3;
+        .filter-button:hover {
+            background: #5a6268;
         }
         
-        .search-results-info {
+        .active-filters {
             margin: 15px 0;
-            padding: 15px;
+            padding: 10px 15px;
             background: #e7f3ff;
-            border-radius: 6px;
-            border-left: 4px solid #007bff;
+            border: 1px solid #b3d9ff;
+            border-radius: 4px;
         }
         
-        .clear-search {
+        .filter-tag {
             display: inline-block;
-            margin-left: 10px;
-            color: #007bff;
-            text-decoration: none;
-            font-weight: 500;
+            background: #007bff;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-right: 8px;
         }
         
-        .clear-search:hover {
+        .clear-filters {
+            color: #dc3545;
+            text-decoration: none;
+            margin-left: 10px;
+            font-size: 14px;
+        }
+        
+        .clear-filters:hover {
             text-decoration: underline;
         }
         
-        .search-stats {
+        .product-category {
+            display: inline-block;
+            background: #e9ecef;
             color: #495057;
-            font-size: 14px;
-            margin-top: 5px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-bottom: 8px;
         }
         
-        .no-results {
-            text-align: center;
-            padding: 40px;
-            color: #6c757d;
+        .category-highlight {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
         }
         
-        .no-results h3 {
-            color: #495057;
-            margin-bottom: 10px;
-        }
-        
-        .search-suggestions {
-            margin-top: 15px;
-            font-size: 14px;
-        }
-        
-        .highlight {
-            background-color: #fff3cd;
-            padding: 2px 4px;
-            border-radius: 3px;
-            font-weight: 500;
-        }
-        
-        .products-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-        
-        .product-card {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            background: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .product-image {
-            text-align: center;
-            margin-bottom: 15px;
-            height: 200px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f8f9fa;
-            border-radius: 4px;
-        }
-        
-        .product-image img {
-            max-width: 100%;
-            max-height: 180px;
-            object-fit: contain;
-            border-radius: 4px;
-        }
-        
-        .product-title {
-            font-size: 18px;
-            margin-bottom: 5px;
-            color: #333;
-        }
-        
-        .product-author {
-            color: #666;
-            margin-bottom: 10px;
-            font-style: italic;
-        }
-        
-        .product-price {
-            font-size: 20px;
-            font-weight: bold;
-            color: #007bff;
-            margin-bottom: 10px;
-        }
-        
-        .product-meta {
-            font-size: 14px;
-            color: #555;
-            margin-bottom: 10px;
-        }
-        
-        .product-meta p {
-            margin: 2px 0;
-        }
-        
-        .product-description {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 10px;
-            line-height: 1.4;
-        }
-        
-        .stock-info {
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
-        
-        .in-stock {
-            color: #28a745;
-            font-weight: bold;
-        }
-        
-        .out-of-stock {
-            color: #dc3545;
-            font-weight: bold;
-        }
-        
-        .product-actions {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .add-to-cart-btn, .view-details-btn {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.3s;
-        }
-        
-        .add-to-cart-btn {
-            background: #28a745;
-            color: white;
-        }
-        
-        .add-to-cart-btn:hover:not(:disabled) {
-            background: #218838;
-        }
-        
-        .add-to-cart-btn:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
-        }
-        
-        .view-details-btn {
-            background: #6c757d;
-            color: white;
-        }
-        
-        .view-details-btn:hover {
-            background: #545b62;
-        }
-        
-        .no-image {
-            color: #999;
-            font-style: italic;
+        @media (max-width: 768px) {
+            .filter-form {
+                flex-direction: column;
+            }
+            
+            .filter-group {
+                min-width: 100%;
+            }
         }
     </style>
 </head>
@@ -292,25 +205,69 @@ include '../sb_head.php';
     <div class="products-container">
         <h1><?php echo $searchQuery ? 'Search Results' : 'Our Books Collection'; ?></h1>
         
-        <!-- Search Form -->
+        <!-- Search and Filter Form -->
         <div class="search-container">
             <form method="GET" class="search-form" id="searchForm">
-                <input type="text" 
-                       name="search" 
-                       class="search-input" 
-                       id="searchInput"
-                       placeholder="Search books by title, author, publisher, or description..."
-                       value="<?php echo htmlspecialchars($searchQuery); ?>"
-                       aria-label="Search books">
-                <button type="submit" class="search-button" id="searchButton">
-                    <?php echo $searchQuery ? 'Search Again' : 'Search Books'; ?>
-                </button>
+                <div class="filter-container">
+                    <div class="filter-form">
+                        <div class="filter-group">
+                            <label for="search">Search Books</label>
+                            <input type="text" 
+                                   name="search" 
+                                   class="search-input" 
+                                   id="searchInput"
+                                   placeholder="Search by title, author, publisher..."
+                                   value="<?php echo htmlspecialchars($searchQuery); ?>"
+                                   aria-label="Search books">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="category">Filter by Category</label>
+                            <select name="category" class="filter-select" id="categoryFilter">
+                                <option value="">All Categories</option>
+                                <?php foreach ($categories as $category): ?>
+                                    <option value="<?php echo $category['id']; ?>" 
+                                        <?php echo ($categoryFilter == $category['id']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($category['name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <button type="submit" class="search-button" id="searchButton">
+                                <?php echo ($searchQuery || $categoryFilter) ? 'Apply Filters' : 'Search Books'; ?>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Active Filters Display -->
+                    <?php if (!empty($searchQuery) || !empty($categoryFilter)): ?>
+                        <div class="active-filters">
+                            <strong>Active Filters:</strong>
+                            <?php if (!empty($searchQuery)): ?>
+                                <span class="filter-tag">Search: "<?php echo htmlspecialchars($searchQuery); ?>"</span>
+                            <?php endif; ?>
+                            <?php if (!empty($categoryFilter)): 
+                                $currentCategoryName = '';
+                                foreach ($categories as $cat) {
+                                    if ($cat['id'] == $categoryFilter) {
+                                        $currentCategoryName = $cat['name'];
+                                        break;
+                                    }
+                                }
+                            ?>
+                                <span class="filter-tag">Category: <?php echo htmlspecialchars($currentCategoryName); ?></span>
+                            <?php endif; ?>
+                            <a href="?" class="clear-filters">Clear All Filters</a>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </form>
             
             <?php if (!empty($searchQuery)): ?>
                 <div class="search-results-info">
                     <strong>Search Results for:</strong> "<span class="highlight"><?php echo htmlspecialchars($searchQuery); ?></span>"
-                    <a href="?" class="clear-search">Show All Books</a>
                     
                     <div class="search-stats">
                         Found <?php echo $totalResults; ?> book<?php echo $totalResults != 1 ? 's' : ''; ?> matching your search
@@ -324,15 +281,34 @@ include '../sb_head.php';
         
         <?php if (empty($searchResults)): ?>
             <div class="no-results">
-                <?php if (!empty($searchQuery)): ?>
+                <?php if (!empty($searchQuery) || !empty($categoryFilter)): ?>
                     <h3>No books found</h3>
-                    <p>No books found matching "<strong><?php echo htmlspecialchars($searchQuery); ?></strong>"</p>
+                    <p>
+                        No books found 
+                        <?php if (!empty($searchQuery)): ?>
+                            matching "<strong><?php echo htmlspecialchars($searchQuery); ?></strong>"
+                        <?php endif; ?>
+                        <?php if (!empty($searchQuery) && !empty($categoryFilter)): ?>
+                            and
+                        <?php endif; ?>
+                        <?php if (!empty($categoryFilter)): 
+                            $currentCategoryName = '';
+                            foreach ($categories as $cat) {
+                                if ($cat['id'] == $categoryFilter) {
+                                    $currentCategoryName = $cat['name'];
+                                    break;
+                                }
+                            }
+                        ?>
+                            in category "<strong><?php echo htmlspecialchars($currentCategoryName); ?></strong>"
+                        <?php endif; ?>
+                    </p>
                     <div class="search-suggestions">
                         <p><strong>Suggestions:</strong></p>
                         <ul>
                             <li>Try different or more general keywords</li>
                             <li>Check your spelling</li>
-                            <li>Search by author name or publisher</li>
+                            <li>Select a different category</li>
                             <li><a href="?">Browse all books</a></li>
                         </ul>
                     </div>
@@ -365,7 +341,7 @@ include '../sb_head.php';
         <?php endif; ?>
     </div>
     
-    <div class="product-details">
+    <div class="product-details">        
         <h3 class="product-title">
             <?php 
             if (!empty($searchQuery)) {
@@ -441,7 +417,7 @@ include '../sb_head.php';
 
         // View product details
         function viewProductDetails(productId) {
-window.location.href = 'product_details.php?id=' + productId;
+            window.location.href = 'product_details.php?id=' + productId;
         }
 
         // Focus on search input when page loads if there's a search query
@@ -458,6 +434,14 @@ window.location.href = 'product_details.php?id=' + productId;
         // Quick search on Enter key
         document.querySelector('.search-input')?.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
+                this.form.submit();
+            }
+        });
+
+        // Auto-submit form when category changes (optional)
+        document.getElementById('categoryFilter')?.addEventListener('change', function() {
+            // Only auto-submit if there's already a search query or if a category is selected
+            if (this.value || document.getElementById('searchInput').value) {
                 this.form.submit();
             }
         });
