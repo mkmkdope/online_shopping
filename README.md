@@ -1,10 +1,7 @@
-Tech
-- vscode
-- php, sql
+--Please use this link to access admin panel
+http://localhost:8000/page/adminPanel.php
 
-dbname = "sbonline";
-
-admin link: http://localhost:8000/
+--Account for testing
 admin user id
 id
 pass
