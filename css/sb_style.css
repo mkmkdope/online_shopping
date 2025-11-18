@@ -257,6 +257,10 @@ footer {
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
 }
 
+.login-container form {
+  position: relative;
+}
+
 .login-container h2 {
   margin-bottom: 20px;
   font-weight: bold;
@@ -271,6 +275,12 @@ footer {
   border: 1px solid #ccc;
   border-radius: 25px;
   font-size: 18px;
+  font-family: Arial, sans-serif;
+  position: relative;
+}
+
+.login-container input:nth-of-type(2) {
+  padding-right: 45px;
 }
 
 .login-container input::placeholder {
@@ -335,4 +345,24 @@ footer {
   z-index: -1;
   image-rendering: auto;
   filter: none;
+}
+
+.eye-icon {
+  width: 24px;
+  height: 24px;
+  position: absolute;
+  right: 40px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  transition: opacity 0.3s ease;
+}
+
+.eye-icon:hover {
+  opacity: 0.7;
 }

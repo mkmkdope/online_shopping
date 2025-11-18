@@ -33,11 +33,12 @@
             <h2>Login</h2>
             <input type="text" name="username" placeholder="Username" required />
             <input type="password" name="password" placeholder="Password" required />
+            <span id="togglePassword" class="eye-icon">&#128065;</span>
             <button type="submit">Login</button>
 
             <div class="login-links">
                 <label><input type="checkbox" />Remember Me</label>
-                <span class="forgotPassword">Forgot Password?</span>
+                <span class="forgotPassword link-span" data-get="forgotPassword">Forgot Password?</span>
             </div>
 
             <div class="login-links">
@@ -52,6 +53,17 @@
             <input type="password" name="password" placeholder="Password" required />
             <input type="password" name="confirm_password" placeholder="Confirm Password" required />
             <button type="submit">REGISTER</button>
+
+            <div class="login-links">
+                <span class="link-span" data-get="login">Back to Login</span>
+            </div>
+        </form>
+
+        <form id="updatePassword-form" style="display:none;" method="POST" action="updatePassword.php">
+            <h2>Update Password</h2>
+            <input type="password" name="password" placeholder="Password" required />
+            <input type="password" name="confirm_password" placeholder="Confirm Password" required />
+            <button type="submit">Confirm</button>
 
             <div class="login-links">
                 <span class="link-span" data-get="login">Back to Login</span>
