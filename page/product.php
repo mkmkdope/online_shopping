@@ -1,528 +1,402 @@
+<?php
+require_once __DIR__ . '/../sb_base.php';  
+require_once __DIR__ . '/product_functions.php';
+
+// Variables
+$searchQuery = '';
+$searchResults = [];
+$totalResults = 0;
+
+// Get all products function
+function get_all_products(): array {
+    global $conn;
+    
+    $sql = "SELECT * FROM products";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute();
+    return $stmt->fetchAll();
+}
+
+// Search
+if (isset($_GET['search']) && !empty(trim($_GET['search']))) {
+    $searchQuery = trim($_GET['search']);
+    $like = "%" . $searchQuery . "%";
+
+    $sql = "
+        SELECT *
+        FROM products
+        WHERE title LIKE ?
+           OR author LIKE ?
+           OR publisher LIKE ?
+           OR description LIKE ?
+        ORDER BY created_at DESC
+    ";
+    
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$like, $like, $like, $like]);
+    $searchResults = $stmt->fetchAll();
+    $totalResults = count($searchResults);
+
+} else {
+    // Show all products
+    $sql = "SELECT * FROM products ORDER BY created_at DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute();
+    $searchResults = $stmt->fetchAll();
+    $totalResults = count($searchResults);
+}
+
+$_title = 'Book Search';
+include '../sb_head.php';
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Book Nook - Product Details</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Book Shop</title>
+
     <style>
-        /* Reset and Base Styles */
         * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-          font-family: "Georgia", serif;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
         body {
-          background-color: #f9f7f2;
-          color: #333;
-          line-height: 1.6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
         }
 
-        a {
-          text-decoration: none;
-          color: inherit;
+        .products-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
         }
 
-        /* Header Styles */
-        header {
-          background-color: #2c3e50;
-          color: #fff;
-          padding: 1rem 2rem;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 32px;
+            color: #222;
         }
 
-        .logo {
-          font-size: 1.8rem;
-          font-weight: bold;
-          letter-spacing: 1px;
+        .search-container {
+            margin-bottom: 40px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
-        nav ul {
-          display: flex;
-          list-style: none;
+        .search-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
         }
 
-        nav li {
-          margin-left: 1.5rem;
+        .search-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            transition: border-color 0.3s;
         }
 
-        nav a:hover {
-          color: #e74c3c;
+        .search-input:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
         }
 
-        /* Main Content */
-        .container {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 2rem;
+        .search-button {
+            padding: 12px 30px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
         }
 
-        .breadcrumb {
-          margin-bottom: 1.5rem;
-          font-size: 0.9rem;
-          color: #7f8c8d;
+        .search-button:hover {
+            background-color: #45a049;
         }
 
-        .breadcrumb a:hover {
-          color: #e74c3c;
+        .search-results-info {
+            color: #666;
+            font-size: 14px;
+            margin-top: 10px;
         }
 
-        .product-details {
-          display: grid;
-          grid-template-columns: 1fr 2fr;
-          gap: 3rem;
-          margin-bottom: 3rem;
+        .search-results-info .highlight {
+            font-weight: 600;
+            color: #4CAF50;
         }
 
-        @media (max-width: 768px) {
-          .product-details {
-            grid-template-columns: 1fr;
-          }
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 8px;
+            color: #999;
+            font-size: 18px;
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 25px;
+            margin-top: 30px;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
         }
 
         .product-image {
-          background: white;
-          border-radius: 4px;
-          overflow: hidden;
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 2rem;
-          height: 400px;
+            width: 100%;
+            height: 280px;
+            background-color: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
         }
 
-        .product-image-placeholder {
-          color: #7f8c8d;
-          text-align: center;
+        .product-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
 
-        .product-info {
-          padding: 1rem 0;
+        .no-image {
+            color: #999;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .product-details {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
         }
 
         .product-title {
-          font-size: 2rem;
-          margin-bottom: 0.5rem;
-          color: #2c3e50;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #222;
+            line-height: 1.3;
+            min-height: 50px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
 
         .product-author {
-          font-size: 1.2rem;
-          color: #7f8c8d;
-          margin-bottom: 1.5rem;
+            color: #777;
+            font-size: 13px;
+            margin-bottom: 10px;
         }
 
         .product-price {
-          font-size: 1.8rem;
-          color: #e74c3c;
-          font-weight: bold;
-          margin-bottom: 1.5rem;
-        }
-
-        .product-meta {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 1rem;
-          margin-bottom: 2rem;
-        }
-
-        .meta-item {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .meta-label {
-          font-size: 0.9rem;
-          color: #7f8c8d;
-          margin-bottom: 0.3rem;
-        }
-
-        .meta-value {
-          font-weight: bold;
-        }
-
-        .product-description {
-          margin-bottom: 2rem;
-          line-height: 1.8;
-        }
-
-        .add-to-cart {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          margin-bottom: 2rem;
-        }
-
-        .quantity-selector {
-          display: flex;
-          align-items: center;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          overflow: hidden;
-        }
-
-        .quantity-btn {
-          background: #f5f5f5;
-          border: none;
-          padding: 0.7rem 1rem;
-          cursor: pointer;
-          font-size: 1.2rem;
-        }
-
-        .quantity-input {
-          width: 50px;
-          text-align: center;
-          border: none;
-          padding: 0.7rem 0;
-          font-size: 1rem;
-        }
-
-        .btn {
-          padding: 0.8rem 1.5rem;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 1rem;
-          transition: background-color 0.3s;
-        }
-
-        .btn-primary {
-          background: #e74c3c;
-          color: white;
-        }
-
-        .btn-primary:hover {
-          background: #c0392b;
-        }
-
-        .btn-secondary {
-          background: #ecf0f1;
-          color: #2c3e50;
-        }
-
-        .btn-secondary:hover {
-          background: #bdc3c7;
+            font-size: 22px;
+            font-weight: 700;
+            color: #4CAF50;
+            margin-bottom: 15px;
         }
 
         .product-actions {
-          display: flex;
-          gap: 1rem;
+            display: flex;
+            gap: 10px;
+            margin-top: auto;
         }
 
-        /* Related Books */
-        .related-books {
-          margin: 3rem 0;
+        .add-to-cart-btn,
+        .view-details-btn {
+            flex: 1;
+            padding: 10px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
         }
 
-        .related-books h2 {
-          text-align: center;
-          margin-bottom: 2rem;
-          color: #2c3e50;
+        .add-to-cart-btn {
+            background-color: #4CAF50;
+            color: white;
         }
 
-        .book-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-          gap: 2rem;
+        .add-to-cart-btn:hover:not(:disabled) {
+            background-color: #45a049;
         }
 
-        .book-card {
-          background: white;
-          border-radius: 4px;
-          overflow: hidden;
-          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-          transition: transform 0.3s;
+        .add-to-cart-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
         }
 
-        .book-card:hover {
-          transform: translateY(-5px);
+        .view-details-btn {
+            background-color: #f0f0f0;
+            color: #333;
+            border: 1px solid #ddd;
         }
 
-        .book-cover {
-          height: 250px;
-          background: #ecf0f1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #7f8c8d;
+        .view-details-btn:hover {
+            background-color: #e0e0e0;
         }
 
-        .book-info {
-          padding: 1rem;
-        }
-
-        .book-title {
-          font-weight: bold;
-          margin-bottom: 0.5rem;
-        }
-
-        .book-author {
-          color: #7f8c8d;
-          font-size: 0.9rem;
-          margin-bottom: 0.5rem;
-        }
-
-        .book-price {
-          color: #e74c3c;
-          font-weight: bold;
-        }
-
-        /* Footer */
-        footer {
-          background: #2c3e50;
-          color: white;
-          padding: 3rem 2rem;
-          margin-top: 3rem;
-        }
-
-        .footer-content {
-          max-width: 1200px;
-          margin: 0 auto;
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 2rem;
-        }
-
-        .footer-section h3 {
-          margin-bottom: 1rem;
-        }
-
-        .footer-section ul {
-          list-style: none;
-        }
-
-        .footer-section li {
-          margin-bottom: 0.5rem;
-        }
-
-        .footer-section a:hover {
-          color: #e74c3c;
-        }
-
-        .copyright {
-          text-align: center;
-          margin-top: 2rem;
-          padding-top: 2rem;
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        /* Responsive */
         @media (max-width: 768px) {
-          header {
-            flex-direction: column;
-            padding: 1rem;
-          }
+            .products-grid {
+                grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+                gap: 15px;
+            }
 
-          nav ul {
-            margin-top: 1rem;
-          }
+            h1 {
+                font-size: 24px;
+            }
 
-          .product-meta {
-            grid-template-columns: 1fr;
-          }
+            .search-form {
+                flex-direction: column;
+            }
 
-          .product-actions {
-            flex-direction: column;
-          }
-
-          .book-grid {
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-          }
+            .product-image {
+                height: 200px;
+            }
         }
     </style>
+
 </head>
 <body>
-    <!-- Header -->
-    <header>
-        <div class="logo">The Book Nook</div>
-        <nav>
-            <ul>
-                <li><a href="#">Home</a></li>
-                <li><a href="#">Books</a></li>
-                <li><a href="#">Categories</a></li>
-                <li><a href="#">Best Sellers</a></li>
-                <li><a href="#">About</a></li>
-                <li><a href="#">Contact</a></li>
-            </ul>
-        </nav>
-    </header>
 
-    <!-- Main Content -->
-    <div class="container">
-        <!-- Breadcrumb -->
-        <div class="breadcrumb">
-            <a href="#">Home</a> > <a href="#">Books</a> > <a href="#">Fiction</a> > The Great Adventure
-        </div>
+<div class="products-container">
+    <h1><?php echo $searchQuery ? 'Search Results' : 'Our Books Collection'; ?></h1>
 
-        <!-- Product Details -->
-        <div class="product-details">
-            <div class="product-image">
-                <div class="product-image-placeholder">
-                    <h3>Book Cover</h3>
-                    <p>The Great Adventure</p>
-                </div>
-            </div>
-            <div class="product-info">
-                <h1 class="product-title">The Great Adventure</h1>
-                <p class="product-author">by John Smith</p>
-                <div class="product-price">$24.99</div>
-                
-                <div class="product-meta">
-                    <div class="meta-item">
-                        <span class="meta-label">ISBN</span>
-                        <span class="meta-value">978-1234567890</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="meta-label">Publisher</span>
-                        <span class="meta-value">Adventure Press</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="meta-label">Publication Date</span>
-                        <span class="meta-value">May 15, 2023</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="meta-label">Pages</span>
-                        <span class="meta-value">320</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="meta-label">Language</span>
-                        <span class="meta-value">English</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="meta-label">Category</span>
-                        <span class="meta-value">Adventure</span>
-                    </div>
-                </div>
-                
-                <div class="product-description">
-                    <p>An exciting journey through unknown lands filled with mystery and discovery. Join our protagonist as they navigate treacherous terrain, encounter fascinating characters, and uncover secrets that will change their world forever.</p>
-                    <p>This epic tale of courage and determination has been praised by critics as "a masterpiece of modern adventure literature" and "a page-turner that will keep you up all night."</p>
-                </div>
-                
-                <div class="add-to-cart">
-                    <div class="quantity-selector">
-                        <button class="quantity-btn">-</button>
-                        <input type="text" class="quantity-input" value="1">
-                        <button class="quantity-btn">+</button>
-                    </div>
-                    <button class="btn btn-primary">Add to Cart</button>
-                </div>
-                
-                <div class="product-actions">
-                    <button class="btn btn-secondary">Add to Wishlist</button>
-                    <button class="btn btn-secondary">Share</button>
-                </div>
-            </div>
-        </div>
+    <!-- Search -->
+    <div class="search-container">
+        <form method="GET" class="search-form">
+            <input type="text" name="search" class="search-input"
+                   placeholder="Search by title, author, publisher..."
+                   value="<?php echo htmlspecialchars($searchQuery); ?>">
+            <button type="submit" class="search-button">
+                <?php echo $searchQuery ? 'Search Again' : 'Search Books'; ?>
+            </button>
+        </form>
 
-        <!-- Related Books -->
-        <div class="related-books">
-            <h2>You Might Also Like</h2>
-            <div class="book-grid">
-                <div class="book-card">
-                    <div class="book-cover">
-                        <div>Book Cover</div>
-                    </div>
-                    <div class="book-info">
-                        <div class="book-title">Mystery of the Lost City</div>
-                        <div class="book-author">by Sarah Johnson</div>
-                        <div class="book-price">$19.99</div>
-                    </div>
-                </div>
-                <div class="book-card">
-                    <div class="book-cover">
-                        <div>Book Cover</div>
-                    </div>
-                    <div class="book-info">
-                        <div class="book-title">Journey to the Center</div>
-                        <div class="book-author">by Michael Brown</div>
-                        <div class="book-price">$22.50</div>
-                    </div>
-                </div>
-                <div class="book-card">
-                    <div class="book-cover">
-                        <div>Book Cover</div>
-                    </div>
-                    <div class="book-info">
-                        <div class="book-title">The Last Explorer</div>
-                        <div class="book-author">by Emily Wilson</div>
-                        <div class="book-price">$21.99</div>
-                    </div>
-                </div>
-                <div class="book-card">
-                    <div class="book-cover">
-                        <div>Book Cover</div>
-                    </div>
-                    <div class="book-info">
-                        <div class="book-title">Beyond the Horizon</div>
-                        <div class="book-author">by Robert Davis</div>
-                        <div class="book-price">$23.75</div>
-                    </div>
-                </div>
+        <?php if ($searchQuery): ?>
+            <div class="search-results-info">
+                Found <?php echo $totalResults ?> book(s)
+                for "<span class="highlight"><?php echo htmlspecialchars($searchQuery); ?></span>"
             </div>
-        </div>
+        <?php endif; ?>
     </div>
 
-    <!-- Footer -->
-    <footer>
-        <div class="footer-content">
-            <div class="footer-section">
-                <h3>About Us</h3>
-                <ul>
-                    <li><a href="#">Our Story</a></li>
-                    <li><a href="#">Careers</a></li>
-                    <li><a href="#">Press</a></li>
-                </ul>
-            </div>
-            <div class="footer-section">
-                <h3>Customer Service</h3>
-                <ul>
-                    <li><a href="#">Contact Us</a></li>
-                    <li><a href="#">Shipping Info</a></li>
-                    <li><a href="#">Returns</a></li>
-                </ul>
-            </div>
-            <div class="footer-section">
-                <h3>Connect</h3>
-                <ul>
-                    <li><a href="#">Newsletter</a></li>
-                    <li><a href="#">Facebook</a></li>
-                    <li><a href="#">Instagram</a></li>
-                </ul>
-            </div>
-        </div>
-        <div class="copyright">
-            &copy; 2023 The Book Nook. All rights reserved.
-        </div>
-    </footer>
+    <!-- No results -->
+    <?php if ($totalResults === 0): ?>
+        <div class="no-results">No books found.</div>
+    <?php else: ?>
 
-    <script>
-        // Quantity selector functionality
-        document.querySelectorAll('.quantity-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                const input = this.parentNode.querySelector('.quantity-input');
-                let value = parseInt(input.value);
-                
-                if (this.textContent === '+') {
-                    value++;
-                } else if (this.textContent === '-' && value > 1) {
-                    value--;
-                }
-                
-                input.value = value;
-            });
+    <!-- Products Grid -->
+    <div class="products-grid">
+        <?php foreach ($searchResults as $product): ?>
+        <div class="product-card">
+            
+            <!-- Product Image -->
+            <div class="product-image">
+                <?php if (!empty($product['cover_image'])): ?>
+                    <img src="../uploads/products/<?php echo htmlspecialchars($product['cover_image']); ?>" 
+                         alt="<?php echo htmlspecialchars($product['title']); ?>">
+                <?php else: ?>
+                    <div class="no-image">No Image</div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Product Info -->
+            <div class="product-details">
+                <h3 class="product-title"><?php echo htmlspecialchars($product['title']); ?></h3>
+                <p class="product-author">by <?php echo htmlspecialchars($product['author']); ?></p>
+
+                <div class="product-price">
+                    $<?php echo number_format($product['price'], 2); ?>
+                </div>
+
+                <!-- Buttons -->
+                <div class="product-actions">
+                    <?php if ($product['stock_quantity'] > 0): ?>
+                        <button class="add-to-cart-btn"
+                                data-id="<?php echo $product['id']; ?>"
+                                data-title="<?php echo htmlspecialchars($product['title']); ?>">
+                            Add to Cart
+                        </button>
+                    <?php else: ?>
+                        <button class="add-to-cart-btn" disabled>Out of Stock</button>
+                    <?php endif; ?>
+
+                    <button class="view-details-btn"
+                            onclick="window.location='product_details.php?id=<?php echo $product['id']; ?>'">
+                        View Details
+                    </button>
+                </div>
+            </div>
+
+        </div>
+        <?php endforeach; ?>
+    </div>
+
+    <?php endif; ?>
+</div>
+
+<script>
+// Add to Cart AJAX
+document.querySelectorAll('.add-to-cart-btn:not(:disabled)').forEach(btn => {
+    btn.addEventListener('click', function() {
+        let id = this.dataset.id;
+        let title = this.dataset.title;
+
+        fetch('../cart_add.php', {
+            method: 'POST',
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: `product_id=${id}&qty=1`
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                alert(`Added "${title}" to Cart!`);
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            alert('Failed to add to cart.');
         });
-        
-        // Add to cart functionality
-        document.querySelector('.btn-primary').addEventListener('click', function() {
-            const quantity = document.querySelector('.quantity-input').value;
-            alert(`Added ${quantity} copy/copies of "The Great Adventure" to your cart!`);
-        });
-    </script>
+    });
+});
+</script>
+
 </body>
 </html>
+
+<?php include '../sb_foot.php'; ?>
