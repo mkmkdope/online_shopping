@@ -61,3 +61,18 @@ INSERT INTO products (category_id, title, author, price, description, publisher,
 (4, 'The Hobbit', 'J.R.R. Tolkien', 11.99, 'A fantasy novel that follows the adventures of Bilbo Baggins as he embarks on a quest to reclaim a lost dwarf kingdom.', 'George Allen & Unwin', '1937-09-21', 310, 'the_hobbit.jpg', 80);
 
 -- product module SQL script ends here
+
+-- cart
+CREATE TABLE cart_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
+-- INSERT INTO cart_items (user_id, product_id, quantity) VALUES
+-- (1, 1, 2); 

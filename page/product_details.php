@@ -152,20 +152,16 @@ include '../sb_head.php';
                     <div class="action-buttons">
                         <?php if ($product['stock_quantity'] > 0): ?>
                             <button class="add-to-cart-btn" 
-                                    data-product-id="<?php echo $product['id']; ?>"
-                                    data-product-title="<?php echo htmlspecialchars($product['title']); ?>"
-                                    data-product-price="<?php echo $product['price']; ?>">
+                                onclick="addToCart(<?php echo $product['id']; ?>)">
                                 Add to Cart
                             </button>
                             <button class="buy-now-btn" 
-                                    data-product-id="<?php echo $product['id']; ?>"
-                                    data-product-title="<?php echo htmlspecialchars($product['title']); ?>"
-                                    data-product-price="<?php echo $product['price']; ?>">
+                                onclick="buyNow(<?php echo $product['id']; ?>)">
                                 Buy Now
                             </button>
                         <?php else: ?>
                             <button class="add-to-cart-btn" disabled>Out of Stock</button>
-                            <button class="buy-now-btn" disabled>Out of Stock</button>
+                            <button class="buy-now-btn" disabled>Notify Me</button>
                         <?php endif; ?>
                     </div>
 
@@ -309,47 +305,40 @@ include '../sb_head.php';
         }
 
         // Add to cart functionality
-        document.querySelectorAll('.add-to-cart-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                if (this.disabled) return;
-                
-                const productId = this.dataset.productId;
-                const productTitle = this.dataset.productTitle;
-                const productPrice = this.dataset.productPrice;
-                
-                // Add your cart logic here
-                console.log('Adding to cart:', productId, productTitle, productPrice);
-                
-                // Example: Show confirmation
-                alert(`Added "${productTitle}" to cart!`);
-                
-                // You can integrate with your shopping cart system here
-                // Example: 
-                // addToCart(productId, productTitle, productPrice, 1);
-            });
-        });
+        function addToCart(productId) {
+            fetch('../cart_add.php', {
+                method: 'POST',
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: `product_id=${productId}&qty=1`
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    alert('Product added to cart!');
+                } else {
+                    alert(data.message || 'Unable to add to cart.');
+                }
+            })
+            .catch(() => alert('Unable to add to cart.'));
+        }
 
         // Buy now functionality
-        document.querySelectorAll('.buy-now-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                if (this.disabled) return;
-                
-                const productId = this.dataset.productId;
-                const productTitle = this.dataset.productTitle;
-                const productPrice = this.dataset.productPrice;
-                
-                // Add your buy now logic here
-                console.log('Buy now:', productId, productTitle, productPrice);
-                
-                // Example: Redirect to checkout or add to cart and go to checkout
-                alert(`Proceeding to checkout with "${productTitle}"!`);
-                
-                // You can integrate with your checkout system here
-                // Example:
-                // addToCart(productId, productTitle, productPrice, 1);
-                // window.location.href = 'checkout.php';
-            });
-        });
+       function buyNow(productId) {
+            fetch('../cart_add.php', {
+                method: 'POST',
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: `product_id=${productId}&qty=1`
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    window.location.href = 'cart_view.php';
+                } else {
+                    alert(data.message || 'Unable to add to cart.');
+                }
+            })
+            .catch(() => alert('Unable to add to cart.'));
+        }
 
         // Keyboard navigation for image gallery
         document.addEventListener('keydown', function(e) {

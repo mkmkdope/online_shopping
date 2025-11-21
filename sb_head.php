@@ -17,6 +17,8 @@
                 <li><a href="/page/category.php">Categories</a></li>
                 <li><a href="/page/about.php">About</a></li>
                 <li><a href="/page/adminProduct.php">temp-product management</a></li>
+                <li><a href="/page/cart_view.php">Cart</a></li>
+
             </ul>
         </nav>
     </header>

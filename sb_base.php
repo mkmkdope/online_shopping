@@ -1,12 +1,18 @@
-//database connection
+
 <?php
 $host = "localhost";
 $user = "root";
 $pass = "";
 $dbname = "sbonline";
 
-$conn = new mysqli($host, $user, $pass, $dbname);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+try{
+    $pdo = new PDO('mysql:dbname=sbonline', 'root', '', [
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,  // 返回关联数组，兼容 MySQLi
+            PDO::ATTR_EMULATE_PREPARES => false,
+ ]);
+
+}catch(PDOException $e){
+    die("Connection failed: ".$e->getMessage());
 }
 ?>
