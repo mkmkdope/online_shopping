@@ -1,7 +1,7 @@
 --Please use this link to access admin panel
 http://localhost:8000/page/adminPanel.php
 
---Account for testing
+--user id for testing
 admin user id
 id
 password
