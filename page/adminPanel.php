@@ -1,3 +1,17 @@
+<?php
+session_start();
+require_once __DIR__ . '/../sb_base.php';
+
+// Get current admin user's profile photo for sidebar
+$currentAdminId = $_SESSION['user_id'] ?? null;
+$adminPhotoPath = '';
+if ($currentAdminId) {
+    $stmt = $pdo->prepare("SELECT profile_photo FROM users WHERE id = ?");
+    $stmt->execute([$currentAdminId]);
+    $adminPhoto = $stmt->fetchColumn();
+    $adminPhotoPath = $adminPhoto ? '/page/uploads/profiles/' . $adminPhoto : '';
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -54,8 +68,8 @@
         }
 
         .admin-avatar {
-            width: 80px;
-            height: 80px;
+            width: 60px;
+            height: 60px;
             border-radius: 50%;
             background-color: #ecf0f1;
             margin: 0 auto 1rem;
@@ -63,7 +77,14 @@
             align-items: center;
             justify-content: center;
             color: #2c3e50;
-            font-size: 2rem;
+            font-size: 1.5rem;
+            overflow: hidden;
+        }
+        
+        .admin-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
 
         .admin-name {
@@ -364,9 +385,13 @@
         
         <div class="admin-info">
             <div class="admin-avatar">
-                <i class="fas fa-user"></i>
+                <?php if ($adminPhotoPath): ?>
+                    <img src="<?= htmlspecialchars($adminPhotoPath) ?>" alt="Profile Photo">
+                <?php else: ?>
+                    <i class="fas fa-user"></i>
+                <?php endif; ?>
             </div>
-            <div class="admin-name">Admin User</div>
+            <div class="admin-name"><?= htmlspecialchars($_SESSION['username'] ?? 'Admin User') ?></div>
             <div class="admin-role">Administrator</div>
         </div>
         
@@ -375,7 +400,7 @@
                 <i class="fas fa-tachometer-alt"></i>
                 <span class="menu-text">Dashboard</span>
             </a>
-            <a href="#" class="menu-item">
+            <a href="adminProduct.php" class="menu-item">
                 <i class="fas fa-book"></i>
                 <span class="menu-text">Books</span>
             </a>
@@ -387,7 +412,7 @@
                 <i class="fas fa-shopping-cart"></i>
                 <span class="menu-text">Orders</span>
             </a>
-            <a href="#" class="menu-item">
+            <a href="admin_user.php" class="menu-item">
                 <i class="fas fa-users"></i>
                 <span class="menu-text">Customers</span>
             </a>
@@ -395,9 +420,13 @@
                 <i class="fas fa-chart-bar"></i>
                 <span class="menu-text">Reports</span>
             </a>
-            <a href="#" class="menu-item">
+            <a href="admin_profile.php" class="menu-item">
                 <i class="fas fa-cog"></i>
                 <span class="menu-text">Settings</span>
+            </a>
+            <a href="/login/logout.php" class="menu-item">
+                <i class="fas fa-sign-out-alt"></i>
+                <span class="menu-text">Logout</span>
             </a>
         </div>
     </div>
