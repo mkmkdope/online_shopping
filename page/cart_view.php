@@ -64,6 +64,8 @@ foreach ($cartItems as $item) {
             padding: 20px;
             border-radius: 5px;
             height: fit-content;
+            position: sticky;
+            top: 20px;
         }
 
         h2 { margin-top: 0; }
@@ -74,6 +76,14 @@ foreach ($cartItems as $item) {
             border-bottom: 1px solid #ddd;
             padding-bottom: 15px;
             margin-bottom: 15px;
+            align-items: flex-start;
+        }
+
+        .item-checkbox {
+            margin-top: 15px;
+            cursor: pointer;
+            width: 20px;
+            height: 20px;
         }
 
         .cart-item img {
@@ -110,11 +120,36 @@ foreach ($cartItems as $item) {
             transition: 0.2s;
         }
 
-        .remove:hover { 
-            color: black; 
+        .remove:hover {
+            color: black;
         }
 
-       
+        .cart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .select-all-btn {
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: 0.2s;
+        }
+
+        .select-all-btn:hover {
+            background: #0056b3;
+        }
+
+        .selection-counter {
+            font-size: 14px;
+            color: #666;
+        }
     </style>
 </head>
 
@@ -127,12 +162,34 @@ foreach ($cartItems as $item) {
 
 <div class="container">
     <div class="cart-items">
-        <h2>My Bag</h2>
+        <div class="cart-header">
+            <h2 style="margin: 0;">My Bag</h2>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <button class="select-all-btn" id="select-all-btn">Select All</button>
+                <span class="selection-counter" id="selection-counter">0 of <?= count($cartItems) ?> items selected</span>
+            </div>
+        </div>
+
+        <?php if (empty($cartItems)): ?>
+            <div style="text-align: center; padding: 60px 20px; color: #999;">
+                <h3 style="margin-bottom: 10px; color: #666;">Your Cart is Empty</h3>
+                <p style="margin-bottom: 20px;">No items in your cart yet. Start shopping!</p>
+                <a href="javascript:history.back()" style="display: inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 3px;">
+                    Continue Shopping
+                </a>
+            </div>
+        <?php endif; ?>
 
         <?php foreach ($cartItems as $item): ?>
             <?php $product = get_product_by_id($item['product_id']); ?>
 
             <div class="cart-item">
+                <input
+                    type="checkbox"
+                    class="item-checkbox"
+                    data-product-id="<?= $item['product_id'] ?>"
+                    checked
+                >
                 <img src="../images/<?= $product['cover_image'] ?>" alt="">
 
                 <div class="item-details">
@@ -202,17 +259,40 @@ document.querySelectorAll('.remove').forEach(btn => {
 
 const qtySelectors = document.querySelectorAll('.qty-selector');
 const subtotalEl = document.getElementById('cart-subtotal');
+const selectionCounterEl = document.getElementById('selection-counter');
+const selectAllBtn = document.getElementById('select-all-btn');
 
 function updateSubtotal() {
     let subtotal = 0;
-    document.querySelectorAll('.line-total').forEach(lineEl => {
-        const amount = parseFloat(lineEl.dataset.lineTotal || '0');
-        if (!isNaN(amount)) {
-            subtotal += amount;
+    let checkedCount = 0;
+    let totalCount = 0;
+
+    document.querySelectorAll('.cart-item').forEach(cartItem => {
+        const checkbox = cartItem.querySelector('.item-checkbox');
+        const lineEl = cartItem.querySelector('.line-total');
+        if (checkbox && lineEl) {
+            totalCount++;
+            if (checkbox.checked) {
+                checkedCount++;
+                const amount = parseFloat(lineEl.dataset.lineTotal || '0');
+                if (!isNaN(amount)) {
+                    subtotal += amount;
+                }
+            }
         }
     });
+
     if (subtotalEl) {
         subtotalEl.textContent = 'RM' + subtotal.toFixed(2);
+    }
+
+    if (selectionCounterEl) {
+        selectionCounterEl.textContent = checkedCount + ' of ' + totalCount + ' items selected';
+    }
+
+    // Update button text based on selection state
+    if (selectAllBtn) {
+        selectAllBtn.textContent = checkedCount === totalCount && totalCount > 0 ? 'Deselect All' : 'Select All';
     }
 }
 
@@ -222,6 +302,7 @@ qtySelectors.forEach(select => {
         const quantity = parseInt(event.target.value, 10) || 0;
         const lineTotal = price * quantity;
         const lineTotalEl = event.target.closest('.cart-item').querySelector('.line-total');
+
         if (lineTotalEl) {
             lineTotalEl.dataset.lineTotal = lineTotal.toFixed(2);
             lineTotalEl.textContent = 'RM' + lineTotal.toFixed(2);
@@ -229,15 +310,56 @@ qtySelectors.forEach(select => {
 
         updateSubtotal();
 
-        // Optional: submit the new quantity to the backend
-         fetch('../cart_update.php', {
-             method: 'POST',
-             body: new URLSearchParams({
-                 product_id: event.target.dataset.productId,
-                 quantity: quantity
-             })
-         });
+        // 防止重复点击：禁用select
+        const currentSelect = event.target;
+        currentSelect.disabled = true;
+
+        // 提交新数量到后端
+        fetch('../cart_update.php', {
+            method: 'POST',
+            body: new URLSearchParams({
+                product_id: event.target.dataset.productId,
+                quantity: quantity
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) {
+                alert(data.message || 'Failed to update cart');
+                // 失败时刷新页面恢复数据
+                location.reload();
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            alert('Failed to update cart');
+            location.reload();
+        })
+        .finally(() => {
+            // 不管成功失败，都重新启用select
+            currentSelect.disabled = false;
+        });
     });
+});
+
+// Handle checkbox changes
+document.querySelectorAll('.item-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', () => {
+        updateSubtotal();
+    });
+});
+
+// Handle Select All button
+selectAllBtn.addEventListener('click', () => {
+    const allCheckboxes = document.querySelectorAll('.item-checkbox');
+    const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
+
+    // Toggle: if all are checked, uncheck all; otherwise, check all
+    allCheckboxes.forEach(checkbox => {
+        checkbox.checked = !allChecked;
+    });
+
+    updateSubtotal();
 });
 
 updateSubtotal();

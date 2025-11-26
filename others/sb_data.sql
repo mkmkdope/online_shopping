@@ -43,3 +43,27 @@ CREATE TABLE cart_items (
 
 -- INSERT INTO cart_items (user_id, product_id, quantity) VALUES
 -- (1, 1, 2); 
+
+
+-- -- orders
+-- CREATE TABLE orders (
+--     order_id INT AUTO_INCREMENT PRIMARY KEY,
+--     user_id INT NOT NULL,
+--     total DECIMAL(10,2) NOT NULL,
+--     status VARCHAR(20) NOT NULL DEFAULT 'PAID',
+--     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (user_id) REFERENCES users(user_id)
+-- );
+
+--payment
+CREATE TABLE payment (
+    payment_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT,
+    amount DECIMAL(10,2) NOT NULL,
+    method VARCHAR(50) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'SUCCESS',
+    reference_no VARCHAR(100),
+    transaction_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    receipt_pdf VARCHAR(255),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

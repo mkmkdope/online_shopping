@@ -357,7 +357,23 @@ include '../sb_head.php';
                             <span class="out-of-stock">✗ Out of Stock</span>
                         <?php endif; ?>
                     </div>
-                    
+
+                    <!-- Quantity Selector -->
+                    <div style="margin-bottom: 25px;">
+                        <label for="qty-input" style="display: block; margin-bottom: 8px; font-weight: bold; color: #333;">
+                            Quantity:
+                        </label>
+                        <input
+                            type="number"
+                            id="qty-input"
+                            name="qty"
+                            value="1"
+                            min="1"
+                            max="<?php echo $product['stock_quantity']; ?>"
+                            style="padding: 10px; width: 100%; max-width: 120px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px;"
+                        >
+                    </div>
+
                     <div class="action-buttons">
                         <?php if ($product['stock_quantity'] > 0): ?>
                             <button class="add-to-cart-btn" 
@@ -393,28 +409,67 @@ include '../sb_head.php';
         
         // Add to cart functionality
         function addToCart(productId) {
-            fetch('../cart_add.php', {
-                method: 'POST',
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: `product_id=${productId}&qty=1`
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.ok) {
-                    alert('Product added to cart!');
-                } else {
-                    alert(data.message || 'Unable to add to cart.');
-                }
-            })
-            .catch(() => alert('Unable to add to cart.'));
+    const btn = event.target;
+    const qtyInput = document.getElementById('qty-input');
+    const quantity = parseInt(qtyInput.value) || 1;
+
+    // 验证数量
+    if (quantity < 1) {
+        alert('Please enter a valid quantity');
+        return;
+    }
+
+    // ★ 防止重复点击：禁用按钮
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.textContent = 'Adding...';
+
+    fetch('./cart_add.php', {
+        method: 'POST',
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `product_id=${productId}&qty=${quantity}`
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            alert(`Added ${quantity} item(s) to cart!`);
+            qtyInput.value = 1;  // 重置数量输入框
+        } else {
+            alert(data.message || 'Unable to add to cart.');
+            // 失败时重新启用按钮
+            btn.disabled = false;
+            btn.textContent = originalText;
         }
+    })
+    .catch(() => {
+        alert('Unable to add to cart.');
+        // 失败时重新启用按钮
+        btn.disabled = false;
+        btn.textContent = originalText;
+    });
+}
         
         // Buy now functionality
         function buyNow(productId) {
-            fetch('../cart_add.php', {
+            const btn = event.target;
+            const qtyInput = document.getElementById('qty-input');
+            const quantity = parseInt(qtyInput.value) || 1;
+
+            // 验证数量
+            if (quantity < 1) {
+                alert('Please enter a valid quantity');
+                return;
+            }
+
+            // ★ 防止重复点击：禁用按钮
+            btn.disabled = true;
+            const originalText = btn.textContent;
+            btn.textContent = 'Processing...';
+
+            fetch('./cart_add.php', {
                 method: 'POST',
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: `product_id=${productId}&qty=1`
+                body: `product_id=${productId}&qty=${quantity}`
             })
             .then(r => r.json())
             .then(data => {
@@ -422,9 +477,15 @@ include '../sb_head.php';
                     window.location.href = 'cart_view.php';
                 } else {
                     alert(data.message || 'Unable to add to cart.');
+                    btn.disabled = false;
+                    btn.textContent = originalText;
                 }
             })
-            .catch(() => alert('Unable to add to cart.'));
+            .catch(() => {
+                alert('Unable to add to cart.');
+                btn.disabled = false;
+                btn.textContent = originalText;
+            });
         }
         
         // Keyboard navigation for image gallery
