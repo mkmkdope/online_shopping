@@ -75,6 +75,7 @@ if (isset($_POST['upload_photo']) && isset($_FILES['photo']) && $_FILES['photo']
                 $stmt = $pdo->prepare("UPDATE $tableName SET profile_photo = ? WHERE id = ?");
                 $stmt->execute([$filename, $userId]);
                 $message = 'Profile photo uploaded successfully!';
+                $_SESSION['profile_photo'] = $filename;
             } else {
                 $error = 'Failed to upload file.';
             }
@@ -182,7 +183,7 @@ if ($addressAction === 'edit' && $addressId) {
 }
 
 // get user data
-$stmt = $pdo->prepare("SELECT id, username, email, profile_photo, role FROM $tableName WHERE id = ?");
+$stmt = $pdo->prepare("SELECT id, username, email, profile_photo, user_role FROM $tableName WHERE id = ?");
 $stmt->execute([$userId]);
 $user = $stmt->fetch();
 
@@ -195,8 +196,13 @@ $userDisplayId = $user['id'];
 $username = $user['username'];
 $email = $user['email'];
 $profilePhoto = $user['profile_photo'];
-$userRole = $user['role'] ?? $userType ?? 'user';
+$userRole = $user['user_role'] ?? $userType ?? 'user';
 $photoPath = $profilePhoto ? '/page/uploads/profiles/' . $profilePhoto : '';
+if ($profilePhoto) {
+    $_SESSION['profile_photo'] = $profilePhoto;
+} else {
+    unset($_SESSION['profile_photo']);
+}
 
 // User/Member layout with regular header
 include __DIR__ . '/../sb_head.php';

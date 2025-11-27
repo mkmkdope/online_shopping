@@ -29,7 +29,13 @@ if (session_status() === PHP_SESSION_NONE) {
             <?php if (isset($_SESSION['user_id'])): ?>
                 <div class="profile-dropdown">
                     <button class="profile-icon" onclick="toggleProfileDropdown()" title="Profile">
-                        <img src="/images/login.jpg" alt="Profile" class="profile-image">
+                        <?php
+                            $profileImage = '/images/login.jpg';
+                            if (!empty($_SESSION['profile_photo'])) {
+                                $profileImage = '/page/uploads/profiles/' . $_SESSION['profile_photo'];
+                            }
+                        ?>
+                        <img src="<?= htmlspecialchars($profileImage) ?>" alt="Profile" class="profile-image">
                     </button>
                     <div class="dropdown-menu" id="profileDropdown">
                         <a href="/page/<?= ($_SESSION['user_type'] ?? '') === 'admin' ? 'admin_profile.php' : 'user_profile.php' ?>">Profile</a>
