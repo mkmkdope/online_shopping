@@ -90,11 +90,11 @@ CREATE TABLE users (
 );
 
 -- Sample admin user
-INSERT INTO users (username, email, password_hash, role) VALUES
+INSERT INTO users (username, email, password_hash, user_role) VALUES
 ('admin', 'admin@example.com', 'admin123', 'admin');
 
--- Sample users
-INSERT INTO users (username, email, password_hash, role) VALUES
+-- Sample users and members
+INSERT INTO users (username, email, password_hash, user_role) VALUES
 ('user1', 'user1@example.com', 'user123', 'user'),
 ('member1', 'member1@example.com', 'member123', 'member');
 

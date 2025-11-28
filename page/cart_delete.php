@@ -9,8 +9,8 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-require __DIR__ . '/sb_base.php';
-require __DIR__ . '/page/cart.php'; // load cart_user_id()
+require __DIR__ . '/../sb_base.php';
+require __DIR__ . '/cart.php'; // load cart_user_id()
 
 if(!isset($_GET['product_id'])){
     exit('no product id');

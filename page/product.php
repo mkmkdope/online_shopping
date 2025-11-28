@@ -405,7 +405,7 @@ document.querySelectorAll('.add-to-cart-btn:not(:disabled)').forEach(btn => {
         let id = this.dataset.id;
         let title = this.dataset.title;
 
-        fetch('../cart_add.php', {
+        fetch('cart_add.php', {
             method: 'POST',
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: `product_id=${id}&qty=1`

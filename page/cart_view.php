@@ -6,7 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // check if user already log in
 if (!isset($_SESSION['user_id'])) {
-    header('Location: /login/index.php?error=Please login to view your cart');
+    header('Location: /login/login.php?error=Please login to view your cart');
     exit;
 }
 
@@ -187,7 +187,7 @@ foreach ($cartItems as $item) {
 document.querySelectorAll('.remove').forEach(btn => {
     btn.addEventListener('click', () => {
         const productId = btn.dataset.productId;
-        fetch('../cart_delete.php?product_id=' + productId)
+        fetch('cart_delete.php?product_id=' + productId)
             .then(res => res.text())
             .then(data => {
                 if(data.includes('deleted')){

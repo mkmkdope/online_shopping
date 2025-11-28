@@ -4,7 +4,7 @@ require_once __DIR__ . '/../sb_base.php';
 
 // check if user is already log in and is adminZ?
 if (!isset($_SESSION['user_id']) || ($_SESSION['user_type'] ?? '') !== 'admin') {
-    header('Location: /login/index.php');
+    header('Location: /login/login.php');
     exit;
 }
 
@@ -108,7 +108,7 @@ $stmt->execute([$userId]);
 $user = $stmt->fetch();
 
 if (!$user) {
-    header('Location: /login/index.php');
+    header('Location: /login/login.php');
     exit;
 }
 

@@ -1,5 +1,6 @@
 <?php
 session_start();
+include '../sb_head.php';
 require_once __DIR__ . '/../sb_base.php';
 
 // initialize variables
@@ -119,19 +120,6 @@ if (isset($_GET['error'])) {
 </head>
 
 <body>
-    <header style="background-color: transparent;">
-        <div class=" logo">SB</div>
-        <nav>
-            <ul>
-                <li><a href="#">Home</a></li>
-                <li><a href="/page/product.php">Books</a></li>
-                <li><a href="#">Categories</a></li>
-                <li><a href="#">About</a></li>
-                <li><a href="#">Contact</a></li>
-            </ul>
-        </nav>
-    </header>
-
     <img src="/images/login_background.jpg" alt="background" class="background-image">
 
     <div class="login-container">

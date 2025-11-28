@@ -11,9 +11,9 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-require __DIR__ . '/sb_base.php';                 // ← 同层
-require __DIR__ . '/page/cart.php';              // ← 进入 page 目录
-require_once __DIR__ . '/page/product_functions.php';
+require __DIR__ . '/../sb_base.php';                 // ← 同层
+require __DIR__ . '/cart.php';              // ← 进入 page 目录
+require_once __DIR__ . '/product_functions.php';
 
 
 header('Content-Type: application/json');

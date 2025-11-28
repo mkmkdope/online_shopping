@@ -1,16 +1,17 @@
+npm i
+php -S localhost:8000
+
 --Please use this link to access admin panel
 http://localhost:8000/page/adminPanel.php
 
 --Account for testing
 admin user id
-id
-pass
+id = admin
+pass = admin123
 
 member user id
-id
-pass
+id = user1
+pass = user123
 
-
-
-test
-
+id = member1
+pass = member123
