@@ -306,7 +306,7 @@ include '../sb_head.php';
 
         // Add to cart functionality
         function addToCart(productId) {
-            fetch('../cart_add.php', {
+            fetch('cart_add.php', {
                 method: 'POST',
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: `product_id=${productId}&qty=1`
@@ -324,7 +324,7 @@ include '../sb_head.php';
 
         // Buy now functionality
        function buyNow(productId) {
-            fetch('../cart_add.php', {
+            fetch('cart_add.php', {
                 method: 'POST',
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: `product_id=${productId}&qty=1`

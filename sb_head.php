@@ -14,15 +14,16 @@ if (session_status() === PHP_SESSION_NONE) {
 </head>
 <body>
     <header>
-        <div class="logo">SB</div>
+        <a href="/index.php" class="logo" title="Back to Home">
+    SB <i class="fas fa-home" style="font-size: 0.7em; margin-left: 4px;"></i>
+</a>
         <div class="header-right">
             <nav>
                 <ul>
                     <li><a href="/index.php">Home</a></li>
-                    <li><a href="/page/product.php">Books</a></li>
-                    <li><a href="/page/category.php">Categories</a></li>
                     <li><a href="/page/about.php">About</a></li>
-                    <li><a href="/page/adminProduct.php">temp-product management</a></li>
+                    <li><a href="/page/product.php">Books</a></li>
+                    <li><a href="/page/promotion.php">Promotion</a></li>
                     <?php if (isset($_SESSION['user_id'])): ?>
                         <li><a href="/page/cart_view.php">Cart</a></li>
                     <?php endif; ?>
@@ -45,7 +46,7 @@ if (session_status() === PHP_SESSION_NONE) {
                     </div>
                 </div>
             <?php else: ?>
-                <a href="/login/index.php" class="login-link">Login</a>
+                <a href="/login/login.php" class="login-link">Login</a>
             <?php endif; ?>
         </div>
     </header>
