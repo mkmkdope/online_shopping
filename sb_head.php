@@ -23,7 +23,9 @@ if (session_status() === PHP_SESSION_NONE) {
                     <li><a href="/page/category.php">Categories</a></li>
                     <li><a href="/page/about.php">About</a></li>
                     <li><a href="/page/adminProduct.php">temp-product management</a></li>
-                    <li><a href="/page/cart_view.php">Cart</a></li>
+                    <?php if (isset($_SESSION['user_id'])): ?>
+                        <li><a href="/page/cart_view.php">Cart</a></li>
+                    <?php endif; ?>
                 </ul>
             </nav>
             <?php if (isset($_SESSION['user_id'])): ?>

@@ -1,4 +1,16 @@
 <?php
+// start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// check if user already log in
+if (!isset($_SESSION['user_id'])) {
+    header('Content-Type: application/json');
+    echo json_encode(['ok' => false, 'message' => 'Please login to add items to cart.']);
+    exit;
+}
+
 require __DIR__ . '/sb_base.php';                 // ← 同层
 require __DIR__ . '/page/cart.php';              // ← 进入 page 目录
 require_once __DIR__ . '/page/product_functions.php';

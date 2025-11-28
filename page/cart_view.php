@@ -4,6 +4,12 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// check if user already log in
+if (!isset($_SESSION['user_id'])) {
+    header('Location: /login/index.php?error=Please login to view your cart');
+    exit;
+}
+
 // Load database and helpers
 require_once __DIR__ . '/../sb_base.php';
 require_once __DIR__ . '/cart.php';

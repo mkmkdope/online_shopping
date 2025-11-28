@@ -2,6 +2,13 @@
     session_start();
 }
 
+// check if user already log in
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo 'Please login to manage your cart.';
+    exit;
+}
+
 require __DIR__ . '/sb_base.php';
 require __DIR__ . '/page/cart.php'; // load cart_user_id()
 
