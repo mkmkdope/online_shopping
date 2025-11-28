@@ -67,6 +67,7 @@ if (isset($_POST['upload_photo']) && isset($_FILES['photo']) && $_FILES['photo']
                 $stmt = $pdo->prepare("UPDATE $tableName SET profile_photo = ? WHERE id = ?");
                 $stmt->execute([$filename, $userId]);
                 $message = 'Profile photo uploaded successfully!';
+                $_SESSION['profile_photo'] = $filename;
             } else {
                 $error = 'Failed to upload file.';
             }
@@ -115,6 +116,11 @@ $username = $user['username'];
 $email = $user['email'];
 $profilePhoto = $user['profile_photo'];
 $photoPath = $profilePhoto ? '/page/uploads/profiles/' . $profilePhoto : '';
+if ($profilePhoto) {
+    $_SESSION['profile_photo'] = $profilePhoto;
+} else {
+    unset($_SESSION['profile_photo']);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">

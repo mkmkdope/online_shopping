@@ -1,7 +1,26 @@
 /* login */
 $(document).ready(function () {
-    $('.link-span').click(function () {
+    // Check URL parameter to show correct form on page load
+    const urlParams = new URLSearchParams(window.location.search);
+    const formParam = urlParams.get('form');
+    
+    if (formParam === 'register') {
+        $('#login-form').hide();
+        $('#updatePassword-form').hide();
+        $('#register-form').show();
+    } else if (formParam === 'forgotPassword') {
+        $('#login-form').hide();
+        $('#register-form').hide();
+        $('#updatePassword-form').show();
+    }
+    
+    $('.link-span').click(function (e) {
+        e.preventDefault();
         const action = $(this).data('get');
+        
+        // Hide all error and success messages when switching forms
+        $('.message').hide();
+        
         if (action === 'register') {
             try {
                 $('#register-form').find('input').val('');
@@ -10,6 +29,7 @@ $(document).ready(function () {
             }
             $('#register-form').find('input[type="checkbox"]').prop('checked', false);
             $('#login-form').hide();
+            $('#updatePassword-form').hide();
             $('#register-form').show();
             $('#form-title').text('Register');
         } else if (action === 'login') {

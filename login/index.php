@@ -34,16 +34,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
         $showForm = 'login';
     } else {
         // check users table
-        $stmt = $pdo->prepare("SELECT id, username, email, password_hash, role FROM users WHERE username = ? OR email = ?");
+        $stmt = $pdo->prepare("SELECT id, username, email, password_hash, user_role, profile_photo FROM users WHERE username = ? OR email = ?");
         $stmt->execute([$username, $username]);
         $user = $stmt->fetch();
         
         if ($user && $password === $user['password_hash']) {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];
-            $_SESSION['user_type'] = $user['role'];
+            $_SESSION['user_type'] = $user['user_role'];
+            if (!empty($user['profile_photo'])) {
+                $_SESSION['profile_photo'] = $user['profile_photo'];
+            } else {
+                unset($_SESSION['profile_photo']);
+            }
             
-            if ($user['role'] === 'admin') {
+            if ($user['user_role'] === 'admin') {
                 header('Location: /page/adminPanel.php');
             } else {
                 header('Location: /index.php');
@@ -81,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_submit'])) {
             $showForm = 'register';
         } else {
             // insert new user (default role is 'user')
-            $stmt = $pdo->prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, 'user')");
+            $stmt = $pdo->prepare("INSERT INTO users (username, email, password_hash, user_role) VALUES (?, ?, ?, 'user')");
             $stmt->execute([$username, $email, $password]);
             
             $success = 'Registration successful! You can now login.';

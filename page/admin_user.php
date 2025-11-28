@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($stmt->fetch()) {
                 $error = 'Username or email already exists';
             } else {
-                $stmt = $pdo->prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)");
+                $stmt = $pdo->prepare("INSERT INTO users (username, email, password_hash, user_role) VALUES (?, ?, ?, ?)");
                 $stmt->execute([$username, $email, $password, $role]);
                 $message = 'Customer created successfully!';
                 $action = 'list';
@@ -62,10 +62,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Username or email already exists';
             } else {
                 if (!empty($password)) {
-                    $stmt = $pdo->prepare("UPDATE users SET username = ?, email = ?, role = ?, password_hash = ? WHERE id = ?");
+                    $stmt = $pdo->prepare("UPDATE users SET username = ?, email = ?, user_role = ?, password_hash = ? WHERE id = ?");
                     $stmt->execute([$username, $email, $role, $password, $id]);
                 } else {
-                    $stmt = $pdo->prepare("UPDATE users SET username = ?, email = ?, role = ? WHERE id = ?");
+                    $stmt = $pdo->prepare("UPDATE users SET username = ?, email = ?, user_role = ? WHERE id = ?");
                     $stmt->execute([$username, $email, $role, $id]);
                 }
                 $message = 'Customer updated successfully!';
@@ -90,17 +90,17 @@ $searchParams = [];
 
 // Build query to exclude admins (only show users and members)
 if (!empty($search)) {
-    $searchQuery = "WHERE role IN ('user', 'member') AND (username LIKE ? OR email LIKE ?)";
+    $searchQuery = "WHERE user_role IN ('user', 'member') AND (username LIKE ? OR email LIKE ?)";
     $searchTerm = "%$search%";
     $searchParams = [$searchTerm, $searchTerm];
 } else {
-    $searchQuery = "WHERE role IN ('user', 'member')";
+    $searchQuery = "WHERE user_role IN ('user', 'member')";
 }
 
 // Get users list (only users and members, exclude admins)
 $users = [];
 if ($action === 'list') {
-    $sql = "SELECT id, username, email, role, profile_photo, created_at FROM users $searchQuery ORDER BY created_at DESC";
+    $sql = "SELECT id, username, email, user_role, profile_photo, created_at FROM users $searchQuery ORDER BY created_at DESC";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($searchParams);
     $users = $stmt->fetchAll();
@@ -110,7 +110,7 @@ if ($action === 'list') {
 $user = null;
 if ($action === 'edit' || $action === 'view') {
     if ($userId) {
-        $stmt = $pdo->prepare("SELECT id, username, email, role, profile_photo, created_at, updated_at FROM users WHERE id = ? AND role IN ('user', 'member')");
+        $stmt = $pdo->prepare("SELECT id, username, email, user_role, profile_photo, created_at, updated_at FROM users WHERE id = ? AND user_role IN ('user', 'member')");
         $stmt->execute([$userId]);
         $user = $stmt->fetch();
         if (!$user) {
@@ -197,7 +197,7 @@ if ($action === 'edit' || $action === 'view') {
     </div>
     
     <?php if ($action === 'list'): ?>
-        <a href="?action=create" class="btn btn-success">
+        <a href="?action=create" class="btn btn-success" style="margin-bottom: 7px;">
             <i class="fas fa-plus"></i> Add New Customer
         </a>
     <?php else: ?>
@@ -255,8 +255,8 @@ if ($action === 'edit' || $action === 'view') {
                                     <td><?= htmlspecialchars($u['username']) ?></td>
                                     <td><?= htmlspecialchars($u['email']) ?></td>
                                     <td>
-                                        <span class="status status-<?= $u['role'] ?>">
-                                            <?= ucfirst($u['role']) ?>
+                                        <span class="status status-<?= $u['user_role'] ?>">
+                                            <?= ucfirst($u['user_role']) ?>
                                         </span>
                                     </td>
                                     <td><?= date('Y-m-d H:i', strtotime($u['created_at'])) ?></td>
@@ -304,8 +304,8 @@ if ($action === 'edit' || $action === 'view') {
                     <h3><?= htmlspecialchars($user['username']) ?></h3>
                     <p><strong>Email:</strong> <?= htmlspecialchars($user['email']) ?></p>
                     <p><strong>Role:</strong> 
-                        <span class="status status-<?= $user['role'] ?>">
-                            <?= ucfirst($user['role']) ?>
+                        <span class="status status-<?= $user['user_role'] ?>">
+                            <?= ucfirst($user['user_role']) ?>
                         </span>
                     </p>
                     <p><strong>Created:</strong> <?= date('Y-m-d H:i:s', strtotime($user['created_at'])) ?></p>
@@ -349,8 +349,8 @@ if ($action === 'edit' || $action === 'view') {
                 <div class="form-group">
                     <label for="role">Role *</label>
                     <select id="role" name="role" class="form-control" required>
-                        <option value="user" <?= ($user['role'] ?? '') === 'user' ? 'selected' : '' ?>>User</option>
-                        <option value="member" <?= ($user['role'] ?? '') === 'member' ? 'selected' : '' ?>>Member</option>
+                        <option value="user" <?= ($user['user_role'] ?? '') === 'user' ? 'selected' : '' ?>>User</option>
+                        <option value="member" <?= ($user['user_role'] ?? '') === 'member' ? 'selected' : '' ?>>Member</option>
                     </select>
                     <small style="color: #7f8c8d;">Note: Admin role cannot be assigned through customer management</small>
                 </div>

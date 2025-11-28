@@ -23,13 +23,21 @@ if (session_status() === PHP_SESSION_NONE) {
                     <li><a href="/page/category.php">Categories</a></li>
                     <li><a href="/page/about.php">About</a></li>
                     <li><a href="/page/adminProduct.php">temp-product management</a></li>
-                    <li><a href="/page/cart_view.php">Cart</a></li>
+                    <?php if (isset($_SESSION['user_id'])): ?>
+                        <li><a href="/page/cart_view.php">Cart</a></li>
+                    <?php endif; ?>
                 </ul>
             </nav>
             <?php if (isset($_SESSION['user_id'])): ?>
                 <div class="profile-dropdown">
                     <button class="profile-icon" onclick="toggleProfileDropdown()" title="Profile">
-                        <img src="/images/login.jpg" alt="Profile" class="profile-image">
+                        <?php
+                            $profileImage = '/images/login.jpg';
+                            if (!empty($_SESSION['profile_photo'])) {
+                                $profileImage = '/page/uploads/profiles/' . $_SESSION['profile_photo'];
+                            }
+                        ?>
+                        <img src="<?= htmlspecialchars($profileImage) ?>" alt="Profile" class="profile-image">
                     </button>
                     <div class="dropdown-menu" id="profileDropdown">
                         <a href="/page/<?= ($_SESSION['user_type'] ?? '') === 'admin' ? 'admin_profile.php' : 'user_profile.php' ?>">Profile</a>
