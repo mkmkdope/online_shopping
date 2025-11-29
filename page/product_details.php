@@ -34,11 +34,13 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
         if (!$product) {
             $error = "Product not found.";
         } else {
-            // Fetch product images
-            $imagesSql = "SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order";
-            $imagesStmt = $pdo->prepare($imagesSql);
-            $imagesStmt->execute([$productId]);
-            $productImages = $imagesStmt->fetchAll(PDO::FETCH_ASSOC);
+            // Get product images from JSON field (single-table approach)
+            $productImages = json_decode($product['images'] ?? '[]', true);
+            
+            // If no images in JSON but cover_image exists, use that
+            if (empty($productImages) && !empty($product['cover_image'])) {
+                $productImages = [$product['cover_image']];
+            }
 
             // Fetch related products (same category)
             if (!empty($product['category_id'])) {
@@ -94,7 +96,7 @@ include '../sb_head.php';
             </div>
         <?php elseif ($product): ?>
             <!-- Back Button -->
-            <a href="product.php" class="back-button">&larr; Back to Products</a>
+            <a href="product_view.php" class="back-button">&larr; Back to Products</a>
 
             <!-- Product Details -->
             <div class="product-details">
@@ -102,7 +104,7 @@ include '../sb_head.php';
                 <div class="product-images">
                     <div class="main-image">
                         <?php if (!empty($productImages)): ?>
-                            <img src="uploads/products/<?php echo htmlspecialchars($productImages[0]['image_path']); ?>" 
+                            <img src="uploads/products/<?php echo htmlspecialchars($productImages[0]); ?>" 
                                  alt="<?php echo htmlspecialchars($product['title']); ?>" 
                                  id="mainProductImage">
                         <?php else: ?>
@@ -116,8 +118,8 @@ include '../sb_head.php';
                         <div class="image-gallery">
                             <?php foreach ($productImages as $index => $image): ?>
                                 <div class="gallery-thumb <?php echo $index === 0 ? 'active' : ''; ?>" 
-                                     onclick="changeMainImage('<?php echo htmlspecialchars($image['image_path']); ?>', this)">
-                                    <img src="uploads/products/<?php echo htmlspecialchars($image['image_path']); ?>" 
+                                     onclick="changeMainImage('<?php echo htmlspecialchars($image); ?>', this)">
+                                    <img src="uploads/products/<?php echo htmlspecialchars($image); ?>" 
                                          alt="<?php echo htmlspecialchars($product['title']); ?>">
                                 </div>
                             <?php endforeach; ?>
@@ -211,80 +213,7 @@ include '../sb_head.php';
                 </div>
             </div>
 
-            <!-- Related Products Section -->
-            <?php if (!empty($relatedProducts)): ?>
-                <div class="related-products">
-                    <h2>Related Books</h2>
-                    <div class="products-grid">
-                        <?php foreach ($relatedProducts as $relatedProduct): ?>
-                            <div class="product-card">
-                                <?php
-                                // Get the first product image for this product
-                                $relatedProductId = $relatedProduct['id'];
-                                $imageSql = "SELECT image_path FROM product_images WHERE product_id = ? ORDER BY sort_order LIMIT 1";
-                                $imageStmt = $pdo->prepare($imageSql);
-                                $imageStmt->execute([$relatedProductId]);
-                                $relatedProductImage = $imageStmt->fetch(PDO::FETCH_ASSOC);
-                                ?>
-                                
-                                <div class="product-image">
-                                    <?php if ($relatedProductImage && !empty($relatedProductImage['image_path'])): ?>
-                                        <img src="uploads/products/<?php echo htmlspecialchars($relatedProductImage['image_path']); ?>" 
-                                             alt="<?php echo htmlspecialchars($relatedProduct['title']); ?>"
-                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                                        <div class="no-image" style="display: none;">Image Failed to Load</div>
-                                    <?php else: ?>
-                                        <div class="no-image">No Image Available</div>
-                                    <?php endif; ?>
-                                </div>
-                                
-                                <div class="product-details">
-                                    <!-- Category Badge -->
-                                    <?php if (!empty($relatedProduct['category_name'])): ?>
-                                        <div class="product-category">
-                                            <?php echo htmlspecialchars($relatedProduct['category_name']); ?>
-                                        </div>
-                                    <?php endif; ?>
-                                    
-                                    <h3 class="product-title">
-                                        <a href="product_details.php?id=<?php echo $relatedProduct['id']; ?>" 
-                                           style="text-decoration: none; color: inherit;">
-                                            <?php echo htmlspecialchars($relatedProduct['title']); ?>
-                                        </a>
-                                    </h3>
-                                    
-                                    <p class="product-author">
-                                        by <?php echo htmlspecialchars($relatedProduct['author']); ?>
-                                    </p>
-                                    
-                                    <div class="product-price">
-                                        $<?php echo number_format($relatedProduct['price'], 2); ?>
-                                    </div>
-                                    
-                                    <div class="product-actions">
-                                        <?php if ($relatedProduct['stock_quantity'] > 0): ?>
-                                            <button class="add-to-cart-btn" 
-                                                    data-product-id="<?php echo $relatedProduct['id']; ?>"
-                                                    data-product-title="<?php echo htmlspecialchars($relatedProduct['title']); ?>"
-                                                    data-product-price="<?php echo $relatedProduct['price']; ?>">
-                                                Add to Cart
-                                            </button>
-                                        <?php else: ?>
-                                            <button class="add-to-cart-btn" disabled>Out of Stock</button>
-                                        <?php endif; ?>
-                                        
-                                        <a href="product_details.php?id=<?php echo $relatedProduct['id']; ?>" 
-                                           class="view-details-btn" 
-                                           style="text-decoration: none; text-align: center;">
-                                            View Details
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            <?php endif; ?>
+
 
         <?php endif; ?>
     </div>
@@ -323,7 +252,7 @@ include '../sb_head.php';
         }
 
         // Buy now functionality
-       function buyNow(productId) {
+        function buyNow(productId) {
             fetch('cart_add.php', {
                 method: 'POST',
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },

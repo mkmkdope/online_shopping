@@ -22,7 +22,7 @@ if (session_status() === PHP_SESSION_NONE) {
                 <ul>
                     <li><a href="/index.php">Home</a></li>
                     <li><a href="/page/about.php">About</a></li>
-                    <li><a href="/page/product.php">Books</a></li>
+                    <li><a href="/page/product_view.php">Books</a></li>
                     <li><a href="/page/promotion.php">Promotion</a></li>
                     <?php if (isset($_SESSION['user_id'])): ?>
                         <li><a href="/page/cart_view.php">Cart</a></li>

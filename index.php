@@ -71,7 +71,7 @@ include 'sb_head.php';
         <section class="hero">
             <h2>Ready to Explore More?</h2>
             <p>Browse our complete collection of books and discover your next great read.</p>
-            <a href="product.php" style="display: inline-block; background: #e74c3c; color: white; padding: 12px 30px; border-radius: 4px; margin-top: 1rem;">View All Books</a>
+            <a href="product_view.php" style="display: inline-block; background: #e74c3c; color: white; padding: 12px 30px; border-radius: 4px; margin-top: 1rem;">View All Books</a>
         </section>
 
         <!-- Additional Sections -->

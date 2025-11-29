@@ -1,3 +1,0 @@
-<!-- 
-page to handle errors 
--->

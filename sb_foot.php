@@ -8,7 +8,7 @@
                 <h3>Quick Links</h3>
                 <ul>
                     <li><a href="/index.php">Home</a></li>
-                    <li><a href="/page/product.php">All Books</a></li>
+                    <li><a href="/page/product_view.php">All Books</a></li>
                     <li><a href="/page/about.php">About Us</a></li>
                 </ul>
             </div>
