@@ -6,12 +6,14 @@ if (session_status() === PHP_SESSION_NONE) {
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SB | Sell Book Online</title>
     <link rel="stylesheet" href="/css/sb_style.css">
 </head>
+
 <body>
     <header>
         <a href="/index.php" class="logo" title="Back to Home">

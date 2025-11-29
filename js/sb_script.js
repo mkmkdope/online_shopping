@@ -1,4 +1,3 @@
-/* login */
 $(document).ready(function () {
     // Check URL parameter to show correct form on page load
     const urlParams = new URLSearchParams(window.location.search);
@@ -45,41 +44,158 @@ $(document).ready(function () {
         }
     });
 
-    $('.eye-icon').on('click', function () {
-        const passwordInput = $('input[name="password"]');
-        const type = passwordInput.attr('type') === 'password' ? 'text' : 'password';
-        passwordInput.attr('type', type);
-        $(this).toggleClass('visible');
-    });
+    $('#login-form').submit(function (e) {
+        e.preventDefault();
 
-    $('#login-form').on('submit', function () {
-        if ($('input[type="checkbox"]').is(':checked')) {
-            localStorage.setItem('username', $('input[name="username"]').val());
-            localStorage.setItem('password', $('input[name="password"]').val());
-            localStorage.setItem('rememberMe', 'true');
-        } else {
-            localStorage.clear();
+        const form = $(this);
+        const username = form.find('input[name="username"]').val().trim();
+        const password = form.find('input[name="password"]').val();
+        const rememberMe = form.find('input[name="remember_me"]').is(':checked');
+
+        let errors = [];
+
+        if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]+$/.test(username)) {
+            errors.push('Username must contain letters and numbers only.');
         }
+
+        if (!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password)) {
+            errors.push('Password must be at least 8 characters with letters, numbers, and special characters.');
+        }
+
+        if (errors.length > 0) {
+            alert(errors.join('\n'));
+            return;
+        }
+
+        $.ajax({
+            url: 'login/login.php',
+            type: 'POST',
+            data: { username: username, password: password, rememberMe: rememberMe },
+            dataType: 'json',
+            success: function (data) {
+                if (data.success) {
+                    form[0].reset();
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    }
+                } else {
+                    alert(data.message);
+                }
+            },
+            error: function (error) {
+                alert('AJAX error: ' + error);
+            }
+        });
     });
 
-    if (localStorage.getItem('rememberMe') === 'true') {
-        $('input[name="username"]').val(localStorage.getItem('username') || '');
-        $('input[name="password"]').val(localStorage.getItem('password') || '');
-        $('input[type="checkbox"]').prop('checked', true);
+    $('#request-form').submit(function (e) {
+        e.preventDefault();
+
+        const form = $(this);
+        const email = form.find('input[name="email"]').val().trim();
+
+        let errors = [];
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            errors.push('Invalid email format.');
+        }
+
+        if (errors.length > 0) {
+            alert(errors.join('\n'));
+            return;
+        }
+
+        $.ajax({
+            url: 'login/request.php',
+            type: 'POST',
+            data: { email: email },
+            dataType: 'json',
+            success: function (data) {
+                if (data.success) {
+                    form[0].reset();
+                    alert('Password reset link sent to your email.');
+                    $('#request-form').show();
+                }
+                else {
+                    alert(data.message);
+                }
+            }
+        });
+    });
+
+    const url = new URLSearchParams(window.location.search);
+    const token = url.get('token');
+
+    const updateForm = $('#updatePassword-form');
+    const validToken = updateForm.attr('data-valid') === 'true';
+    $('#login-form, #register-form, #request-form, #updatePassword-form').hide();
+
+    // Show the correct form
+    if (validToken) {
+        updateForm.show();
     } else {
-        $('input[]').val('');
+        $('#login-form').show();
     }
 
-    $('input[type="checkbox"]').on('change', function () {
-        if ($(this).prop('checked')) {
-            localStorage.setItem('username', $('input[name="username"]').val());
-            localStorage.setItem('password', $('input[name="password"]').val());
-            localStorage.setItem('rememberMe', 'true');
-        } else {
-            localStorage.clear();
-        }
+
+
+    $('.link-span').click(function () {
+        const action = $(this).data('get');
+        $('#login-form, #register-form, #request-form, #updatePassword-form').hide();
+
+        if (action === 'register') $('#register-form').show();
+        if (action === 'login') $('#login-form').show();
+        if (action === 'forgotPassword') $('#request-form').show();
+        if (action === 'updatePassword') $('#updatePassword-form').show();
     });
+
+
+
+
+    $('#updatePassword-form').submit(function (e) {
+        e.preventDefault();
+
+        const form = $(this);
+        const password = form.find('input[name="password"]').val();
+        const confirm_password = form.find('input[name="confirm_password"]').val();
+
+        let errors = [];
+
+        if (!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password)) {
+            errors.push('Password must be at least 8 characters with letters, numbers, and special characters.');
+        }
+
+        if (password !== confirm_password) {
+            errors.push('Passwords do not match.');
+        }
+
+        if (errors.length > 0) {
+            alert(errors.join('\n'));
+            return;
+        }
+
+        $.ajax({
+            url: 'login/updatePass.php',
+            type: 'POST',
+            data: { password: password, confirm_password: confirm_password, token: token },
+            dataType: 'json',
+            success: function (data) {
+                if (data.success) {
+                    form[0].reset();
+                    form.hide();
+                    alert('Password updated successfully! Please log in.');
+                    $('#login-form').show();
+                } else {
+                    alert(data.message);
+                }
+            },
+            error: function (error) {
+                alert('AJAX error: ' + error);
+            }
+        });
+
+    });
+
+
+
 });
-
-
-
