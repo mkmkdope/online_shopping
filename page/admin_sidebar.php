@@ -25,7 +25,7 @@ if ($currentAdminId) {
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="logo">
-            <span class="logo-text">Chapter One</span>
+            <span class="logo-text">SB Online</span>
         </div>
         
         <div class="admin-info">
@@ -45,11 +45,15 @@ if ($currentAdminId) {
                 <i class="fas fa-tachometer-alt"></i>
                 <span class="menu-text">Dashboard</span>
             </a>
-            <a href="adminProduct.php" class="menu-item">
+            <a href="product_panel.php" class="menu-item">
                 <i class="fas fa-book"></i>
                 <span class="menu-text">Books</span>
             </a>
-            <a href="#" class="menu-item">
+                        <a href="product_reorder.php" class="menu-item">
+                <i class="fas fa-book"></i>
+                <span class="menu-text">Restock</span>
+            </a>
+            <a href="product_category.php" class="menu-item">
                 <i class="fas fa-tags"></i>
                 <span class="menu-text">Categories</span>
             </a>

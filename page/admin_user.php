@@ -158,7 +158,7 @@ if ($action === 'edit' || $action === 'view') {
                 <i class="fas fa-tachometer-alt"></i>
                 <span class="menu-text">Dashboard</span>
             </a>
-            <a href="adminProduct.php" class="menu-item">
+            <a href="product_panel.php" class="menu-item">
                 <i class="fas fa-book"></i>
                 <span class="menu-text">Books</span>
             </a>
