@@ -1,75 +1,47 @@
 $(document).ready(function () {
-
-    $('.eye-icon').on('click', function () {
-        const input = $(this).prev('input');
-        const type = input.attr('type') === 'password' ? 'text' : 'password';
-        input.attr('type', type);
-    });
-
-
-    $('#register-form').submit(function (e) {
+    // Check URL parameter to show correct form on page load
+    const urlParams = new URLSearchParams(window.location.search);
+    const formParam = urlParams.get('form');
+    
+    if (formParam === 'register') {
+        $('#login-form').hide();
+        $('#updatePassword-form').hide();
+        $('#register-form').show();
+    } else if (formParam === 'forgotPassword') {
+        $('#login-form').hide();
+        $('#register-form').hide();
+        $('#updatePassword-form').show();
+    }
+    
+    $('.link-span').click(function (e) {
         e.preventDefault();
-
-        const form = $(this);
-        const username = form.find('input[name="username"]').val().trim();
-        const email = form.find('input[name="email"]').val().trim();
-        const password = form.find('input[name="password"]').val();
-        const confirm_password = form.find('input[name="confirm_password"]').val();
-        const profile_img = form.find('input[name="profile_img"]')[0].files[0];
-
-        let errors = [];
-
-        if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]+$/.test(username)) {
-            errors.push('Username must contain letters and numbers only.');
-        }
-
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            errors.push('Invalid email format.');
-        }
-
-        if (!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password)) {
-            errors.push('Password must be at least 8 characters with letters, numbers, and special characters.');
-        }
-
-        if (password !== confirm_password) {
-            errors.push('Passwords do not match.');
-        }
-
-        if (profile_img) {
-            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-            if (!allowedTypes.includes(profile_img.type)) {
-                errors.push('Profile image must be JPG, PNG, or GIF.');
+        const action = $(this).data('get');
+        
+        // Hide all error and success messages when switching forms
+        $('.message').hide();
+        
+        if (action === 'register') {
+            try {
+                $('#register-form').find('input').val('');
+            } catch (ex) {
+                console.error('Error clearing register form inputs:', ex);
             }
+            $('#register-form').find('input[type="checkbox"]').prop('checked', false);
+            $('#login-form').hide();
+            $('#updatePassword-form').hide();
+            $('#register-form').show();
+            $('#form-title').text('Register');
+        } else if (action === 'login') {
+            $('#register-form').hide();
+            $('#updatePassword-form').hide();
+            $('#login-form').show();
+            $('#form-title').text('Login');
+        } else if (action === 'forgotPassword') {
+            $('#register-form').hide();
+            $('#login-form').hide();
+            $('#updatePassword-form').show();
+            $('#form-title').text('Update Password');
         }
-
-        if (errors.length > 0) {
-            alert(errors.join('\n'));
-            return;
-        }
-
-        const formData = new FormData(this);
-
-        $.ajax({
-            url: 'login/register.php',
-            type: 'POST',
-            data: formData,
-            contentType: false,
-            processData: false,
-            dataType: 'json',
-            success: function (data) {
-                if (data.success) {
-                    form[0].reset();
-                    form.hide();
-                    $('#login-form').show();
-                    alert('Registration successful! Please log in.');
-                } else {
-                    alert(data.message);
-                }
-            },
-            error: function (error) {
-                alert('AJAX error: ' + error);
-            }
-        });
     });
 
     $('#login-form').submit(function (e) {
