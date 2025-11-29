@@ -61,3 +61,54 @@ INSERT INTO products (category_id, title, author, price, description, publisher,
 (4, 'The Hobbit', 'J.R.R. Tolkien', 11.99, 'A fantasy novel that follows the adventures of Bilbo Baggins as he embarks on a quest to reclaim a lost dwarf kingdom.', 'George Allen & Unwin', '1937-09-21', 310, 'the_hobbit.jpg', 80);
 
 -- product module SQL script ends here
+
+-- cart
+CREATE TABLE cart_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
+-- INSERT INTO cart_items (user_id, product_id, quantity) VALUES
+-- (1, 1, 2); 
+
+-- Users table for all user types: user, member, and admin
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    user_role ENUM('user', 'member', 'admin') DEFAULT 'user' NOT NULL,
+    profile_photo VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Sample admin user
+INSERT INTO users (username, email, password_hash, user_role) VALUES
+('admin', 'admin@example.com', 'admin123', 'admin');
+
+-- Sample users and members
+INSERT INTO users (username, email, password_hash, user_role) VALUES
+('user1', 'user1@example.com', 'user123', 'user'),
+('member1', 'member1@example.com', 'member123', 'member');
+
+-- Addresses table for users and members (admins don't need addresses)
+CREATE TABLE addresses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    street VARCHAR(255) NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    address_state VARCHAR(100) NOT NULL,
+    zip_code VARCHAR(20) NOT NULL,
+    is_default BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id)
+);

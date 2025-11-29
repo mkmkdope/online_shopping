@@ -377,12 +377,11 @@ include '../sb_head.php';
         
         <div class="product-actions">
             <?php if ($product['stock_quantity'] > 0): ?>
-                <button class="add-to-cart-btn" 
-                        data-product-id="<?php echo $product['id']; ?>"
-                        data-product-title="<?php echo htmlspecialchars($product['title']); ?>"
-                        data-product-price="<?php echo $product['price']; ?>">
-                    Add to Cart
-                </button>
+                        <button class="add-to-cart-btn"
+                                data-id="<?php echo $product['id']; ?>"
+                                data-title="<?php echo htmlspecialchars($product['title']); ?>">
+                            Add to Cart
+                        </button>
             <?php else: ?>
                 <button class="add-to-cart-btn" disabled>Out of Stock</button>
             <?php endif; ?>
@@ -400,20 +399,31 @@ include '../sb_head.php';
     </div>
 
     <script>
-        // Add to cart functionality
-        document.querySelectorAll('.add-to-cart-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                const productId = this.dataset.productId;
-                const productTitle = this.dataset.productTitle;
-                const productPrice = this.dataset.productPrice;
-                
-                // Add your cart logic here
-                console.log('Adding to cart:', productId, productTitle, productPrice);
-                
-                // Example: Show confirmation
-                alert(`Added "${productTitle}" to cart!`);
-            });
+       // Add to Cart AJAX
+document.querySelectorAll('.add-to-cart-btn:not(:disabled)').forEach(btn => {
+    btn.addEventListener('click', function() {
+        let id = this.dataset.id;
+        let title = this.dataset.title;
+
+        fetch('cart_add.php', {
+            method: 'POST',
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: `product_id=${id}&qty=1`
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                alert(`Added "${title}" to Cart!`);
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            alert('Failed to add to cart.');
         });
+    });
+});
 
         // View product details
         function viewProductDetails(productId) {

@@ -1,5 +1,5 @@
 <?php
-include '../sb_head.php';
+include 'admin_sidebar.php';
 // Database configuration
 $host = 'localhost';
 $dbname = 'sbonline';
@@ -248,7 +248,6 @@ function handleFileUpload() {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Product Management</title>
     <style>
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
         .message { padding: 10px; margin: 10px 0; border-radius: 4px; }
         .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
@@ -273,7 +272,7 @@ function handleFileUpload() {
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="main-content container">
         <h1>Product Management</h1>
 
         <!-- Display messages -->
@@ -488,5 +487,3 @@ function handleFileUpload() {
 
 </body>
 </html>
-<?php
-include '../sb_foot.php';
