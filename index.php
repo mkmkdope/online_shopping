@@ -1,139 +1,99 @@
 <?php
-session_start();
-include __DIR__ . '/sb_base.php';
-
-if (!isset($_SESSION['username']) && !empty($_COOKIE['remember_me'])) {
-    $token = $_COOKIE['remember_me'];
-
-    $stmt = $conn->prepare("SELECT username, role, remember_token FROM users WHERE remember_token IS NOT NULL");
-    $stmt->execute();
-    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $found = false;
-    foreach ($users as $user) {
-        if (password_verify($token, $user['remember_token'])) {
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['role'] = $user['role'];
-            $found = true;
-            break;
-        }
-    }
-
-    if (!$found) {
-        // Remove invalid cookie
-        setcookie('remember_me', '', time() - 3600, "/");
-    }
-}
-
-// Redirect if already logged in
-if (isset($_SESSION['username'])) {
-    header("Location: home.php");
-    exit;
-}
-
-
+$_title = 'Welcome to SB Online';
+include 'sb_head.php';
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SB | Sell Book Online</title>
-    <link rel="stylesheet" href="/css/sb_style.css?v=1">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="/js/sb_script.js"></script>
+    <title><?php echo $_title; ?></title>
+    <link rel="stylesheet" href="sb_style.css">
 </head>
-
 <body>
-    <header style="background-color: transparent;">
-        <div class=" logo">SB</div>
-        <nav>
-            <ul>
-                <li><a href="#">Home</a></li>
-                <li><a href="/page/product.php">Books</a></li>
-                <li><a href="#">Categories</a></li>
-                <li><a href="#">About</a></li>
-                <li><a href="#">Contact</a></li>
-            </ul>
-        </nav>
-    </header>
+    <main class="container">
 
-    <img src="/images/login_background.jpg" alt="background" class="background-image">
-
-    <div class="login-container">
-        <img src="/images/login.jpg" alt="User" class="user-icon">
-
-        <form id="updatePassword-form" style="display:none;" enctype="multipart/form-data" data-valid="<?php echo $validToken ? 'true' : 'false'; ?>">
-            <h2>Update Password</h2>
-            <div class="password-wrapper">
-                <input type="password" name="password" placeholder="New Password" required />
-                <span class="eye-icon">&#128065;</span>
-            </div>
-
-            <div class="password-wrapper">
-                <input type="password" name="confirm_password" placeholder="Confirm New Password" required />
-                <span class="eye-icon">&#128065;</span>
-            </div>
-            <button type="submit">Update Password</button>
-
-            <div class="login-links">
-                <span class="link-span" data-get="login">Back to Login</span>
-            </div>
-        </form>
-
-        <form id="login-form" enctype="multipart/form-data">
-            <h2>Login</h2>
-            <input type="text" name="username" placeholder="Username" required />
-            <div class="password-wrapper">
-                <input type="password" name="password" placeholder="Password" required />
-                <span class="eye-icon">&#128065;</span>
-            </div>
-            <button type="submit">Login</button>
-
-            <div class="login-links">
-                <label><input type="checkbox" name="remember_me" />Remember Me</label>
-                <span class="link-span" data-get="forgotPassword">Forgot Password?</span>
-            </div>
-
-            <div class="login-links">
-                <span class="link-span" data-get="register">Create an Account</span>
-            </div>
-        </form>
-
-        <form id="register-form" style="display:none;" enctype="multipart/form-data">
-            <h2>Register</h2>
-            <input type="text" name="username" placeholder="Username" required />
-            <input type="email" name="email" placeholder="Email" required />
-
-            <div class="password-wrapper">
-                <input type="password" name="password" placeholder="Password" required />
-                <span class="eye-icon">&#128065;</span>
-            </div>
-
-            <div class="password-wrapper">
-                <input type="password" name="confirm_password" placeholder="Confirm Password" required />
-                <span class="eye-icon">&#128065;</span>
-            </div>
-
-            <input type="file" name="profile_img" accept="image/*" />
-            <button type="submit">REGISTER</button>
-
-            <div id="register-message" style="display:none; padding:10px; margin-top:10px; border-radius:5px;"></div>
-
-            <div class="login-links">
-                <span class="link-span" data-get="login">Back to Login</span>
-            </div>
-        </form>
-
-
-        <form id="request-form">
-            <h2>Update Password</h2>
-            <input type="email" name="email" placeholder="Email" required />
-            <button type="submit">Confirm</button>
-        </form>
+  <!-- Hero Section -->
+<section class="hero" id="home">
+    <div class="hero-content">
+        <div class="hero-content">
+            <h1>Discover Your Next Great Read</h1>
+            <p>Explore thousands of books across every genre. From timeless classics to the latest bestsellers — all in one place.</p>
+            <a href="#featured" class="btn">Browse Books</a>
+        </div>
     </div>
-</body>
+</section>
 
+        <!-- Featured Books -->
+        <section class="featured-books">
+            <h2>Featured Books</h2>
+            <div class="book-grid">
+                <!-- Book 1 -->
+                <div class="book-card">
+                    <div class="book-cover">
+                        <span>Book Cover</span>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">The Great Gatsby</div>
+                        <div class="book-author">F. Scott Fitzgerald</div>
+                        <div class="book-price">$10.99</div>
+                    </div>
+                </div>
+
+                <!-- Book 2 -->
+                <div class="book-card">
+                    <div class="book-cover">
+                        <span>Book Cover</span>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">1984</div>
+                        <div class="book-author">George Orwell</div>
+                        <div class="book-price">$8.99</div>
+                    </div>
+                </div>
+
+                <!-- Book 3 -->
+                <div class="book-card">
+                    <div class="book-cover">
+                        <span>Book Cover</span>
+                    </div>
+                    <div class="book-info">
+                        <div class="book-title">To Kill a Mockingbird</div>
+                        <div class="book-author">Harper Lee</div>
+                        <div class="book-price">$12.99</div>
+                    </div>
+                </div>
+
+        </section>
+
+        <!-- Call to Action -->
+        <section class="hero">
+            <h2>Ready to Explore More?</h2>
+            <p>Browse our complete collection of books and discover your next great read.</p>
+            <a href="product.php" style="display: inline-block; background: #e74c3c; color: white; padding: 12px 30px; border-radius: 4px; margin-top: 1rem;">View All Books</a>
+        </section>
+
+        <!-- Additional Sections -->
+        <section style="margin: 4rem 0;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
+                <div style="text-align: center; padding: 2rem; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <h3 style="color: #2c3e50; margin-bottom: 1rem;">📖 Free Shipping</h3>
+                    <p>Free delivery on orders over $25. Fast and reliable shipping to your doorstep.</p>
+                </div>
+                
+                <div style="text-align: center; padding: 2rem; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <h3 style="color: #2c3e50; margin-bottom: 1rem;">⭐ Customer Reviews</h3>
+                    <p>Read genuine reviews from our community of book lovers before you buy.</p>
+                </div>
+                
+                <div style="text-align: center; padding: 2rem; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <h3 style="color: #2c3e50; margin-bottom: 1rem;">🔒 Secure Payment</h3>
+                    <p>Shop with confidence using our secure payment processing system.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+</body>
 </html>
+<?php include 'sb_foot.php'; ?>
