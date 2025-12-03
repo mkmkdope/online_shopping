@@ -8,41 +8,73 @@ $password = '';
 // Initialize variables
 $product = null;
 $productImages = [];
+$relatedProducts = [];
 $error = '';
 
-try {
-    // Create PDO connection
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+// Check if product ID is provided
+if (!isset($_GET['id']) || empty($_GET['id'])) {
+    $error = "Product ID is required.";
+} else {
+    $productId = intval($_GET['id']);
     
-    // Get product ID from URL
-    $productId = $_GET['id'] ?? 0;
-    
-    if ($productId) {
-        // Fetch product details
-        $sql = "SELECT * FROM products WHERE id = ?";
+    try {
+        // Create PDO connection
+        $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        // Fetch product details with category information
+        $sql = "SELECT p.*, c.name as category_name, c.id as category_id 
+                FROM products p 
+                LEFT JOIN categories c ON p.category_id = c.id 
+                WHERE p.id = ?";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$productId]);
         $product = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        // Fetch product images if product exists
-        if ($product) {
-            $sql = "SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order, created_at";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([$productId]);
-            $productImages = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!$product) {
+            $error = "Product not found.";
+        } else {
+            // Get product images from JSON field (single-table approach)
+            $productImages = json_decode($product['images'] ?? '[]', true);
+            
+            // If no images in JSON but cover_image exists, use that
+            if (empty($productImages) && !empty($product['cover_image'])) {
+                $productImages = [$product['cover_image']];
+            }
+
+            // Fetch related products (same category)
+            if (!empty($product['category_id'])) {
+                $relatedSql = "SELECT p.*, c.name as category_name 
+                              FROM products p 
+                              LEFT JOIN categories c ON p.category_id = c.id 
+                              WHERE p.category_id = ? AND p.id != ? 
+                              ORDER BY RAND() 
+                              LIMIT 4";
+                $relatedStmt = $pdo->prepare($relatedSql);
+                $relatedStmt->execute([$product['category_id'], $productId]);
+                $relatedProducts = $relatedStmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+
+            // If no related products from same category, get random products
+            if (empty($relatedProducts)) {
+                $randomSql = "SELECT p.*, c.name as category_name 
+                             FROM products p 
+                             LEFT JOIN categories c ON p.category_id = c.id 
+                             WHERE p.id != ? 
+                             ORDER BY RAND() 
+                             LIMIT 4";
+                $randomStmt = $pdo->prepare($randomSql);
+                $randomStmt->execute([$productId]);
+                $relatedProducts = $randomStmt->fetchAll(PDO::FETCH_ASSOC);
+            }
         }
+
+    } catch (PDOException $e) {
+        $error = "Database error: " . $e->getMessage();
     }
-    
-    if (!$product) {
-        $error = "Product not found!";
-    }
-    
-} catch (PDOException $e) {
-    $error = "Database error: " . $e->getMessage();
 }
 
-$_title = $product ? $product['title'] : 'Product Not Found';
+$_title = $product ? htmlspecialchars($product['title']) : 'Product Details';
 include '../sb_head.php';
 ?>
 
@@ -51,305 +83,65 @@ include '../sb_head.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars($_title); ?> - Book Shop</title>
-    <style>
-        .product-details-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .back-button {
-            display: inline-block;
-            margin-bottom: 20px;
-            padding: 10px 15px;
-            background: #6c757d;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            transition: background 0.3s;
-        }
-        
-        .back-button:hover {
-            background: #545b62;
-        }
-        
-        .product-details {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 40px;
-            margin-top: 20px;
-        }
-        
-        @media (max-width: 768px) {
-            .product-details {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        .product-images {
-            position: sticky;
-            top: 20px;
-        }
-        
-        .main-image {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        
-        .main-image img {
-            max-width: 100%;
-            max-height: 500px;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        
-        .image-gallery {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-        }
-        
-        .gallery-thumb {
-            cursor: pointer;
-            border: 2px solid transparent;
-            border-radius: 4px;
-            transition: border-color 0.3s;
-        }
-        
-        .gallery-thumb:hover,
-        .gallery-thumb.active {
-            border-color: #007bff;
-        }
-        
-        .gallery-thumb img {
-            width: 100%;
-            height: 80px;
-            object-fit: cover;
-            border-radius: 4px;
-        }
-        
-        .product-info {
-            padding: 20px;
-        }
-        
-        .product-title {
-            font-size: 28px;
-            margin-bottom: 10px;
-            color: #333;
-        }
-        
-        .product-author {
-            font-size: 20px;
-            color: #666;
-            margin-bottom: 20px;
-            font-style: italic;
-        }
-        
-        .product-price {
-            font-size: 24px;
-            font-weight: bold;
-            color: #007bff;
-            margin-bottom: 20px;
-        }
-        
-        .product-meta {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        
-        .meta-item {
-            margin-bottom: 10px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #dee2e6;
-        }
-        
-        .meta-item:last-child {
-            margin-bottom: 0;
-            padding-bottom: 0;
-            border-bottom: none;
-        }
-        
-        .meta-label {
-            font-weight: bold;
-            color: #495057;
-            display: inline-block;
-            width: 120px;
-        }
-        
-        .meta-value {
-            color: #333;
-        }
-        
-        .product-description {
-            line-height: 1.6;
-            color: #555;
-            margin-bottom: 30px;
-        }
-        
-        .stock-info {
-            margin-bottom: 30px;
-            font-size: 16px;
-        }
-        
-        .in-stock {
-            color: #28a745;
-            font-weight: bold;
-        }
-        
-        .out-of-stock {
-            color: #dc3545;
-            font-weight: bold;
-        }
-        
-        .action-buttons {
-            display: flex;
-            gap: 15px;
-            margin-top: 30px;
-        }
-        
-        .add-to-cart-btn, .buy-now-btn {
-            padding: 15px 30px;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background 0.3s;
-            flex: 1;
-        }
-        
-        .add-to-cart-btn {
-            background: #28a745;
-            color: white;
-        }
-        
-        .add-to-cart-btn:hover:not(:disabled) {
-            background: #218838;
-        }
-        
-        .buy-now-btn {
-            background: #007bff;
-            color: white;
-        }
-        
-        .buy-now-btn:hover:not(:disabled) {
-            background: #0056b3;
-        }
-        
-        .add-to-cart-btn:disabled,
-        .buy-now-btn:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
-        }
-        
-        .no-image {
-            text-align: center;
-            padding: 40px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            color: #6c757d;
-            font-style: italic;
-        }
-        
-        .error-message {
-            text-align: center;
-            padding: 40px;
-            color: #dc3545;
-            background: #f8d7da;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
-    </style>
+    <title><?php echo $_title; ?> - Book Shop</title>
+    <link rel="stylesheet" href="/css/product.css">
 </head>
 <body>
     <div class="product-details-container">
-        <!-- Back Button -->
-        <a href="javascript:history.back()" class="back-button">← Back to Results</a>
-        
         <?php if ($error): ?>
             <div class="error-message">
-                <h2>Error</h2>
+                <h3>Error</h3>
                 <p><?php echo htmlspecialchars($error); ?></p>
-                <a href="search_products.php" class="back-button">Browse All Books</a>
+                <a href="product.php" class="back-button">Back to Products</a>
             </div>
         <?php elseif ($product): ?>
+            <!-- Back Button -->
+            <a href="product_view.php" class="back-button">&larr; Back to Products</a>
+
+            <!-- Product Details -->
             <div class="product-details">
-                <!-- Product Images Section -->
+                <!-- Product Images -->
                 <div class="product-images">
                     <div class="main-image">
                         <?php if (!empty($productImages)): ?>
-                            <img src="uploads/products/<?php echo htmlspecialchars($productImages[0]['image_path']); ?>" 
-                                 alt="<?php echo htmlspecialchars($product['title']); ?>" 
-                                 id="mainProductImage">
-                        <?php elseif (!empty($product['cover_image'])): ?>
-                            <img src="uploads/products/<?php echo htmlspecialchars($product['cover_image']); ?>" 
+                            <img src="uploads/products/<?php echo htmlspecialchars($productImages[0]); ?>" 
                                  alt="<?php echo htmlspecialchars($product['title']); ?>" 
                                  id="mainProductImage">
                         <?php else: ?>
-                            <div class="no-image">
+                            <div class="no-image" style="height: 400px; display: flex; align-items: center; justify-content: center; background: #f8f9fa; border-radius: 8px;">
                                 No Image Available
                             </div>
                         <?php endif; ?>
                     </div>
-                    
-                    <!-- Image Gallery -->
-                    <?php if (!empty($productImages) && count($productImages) > 1): ?>
+
+                    <?php if (count($productImages) > 1): ?>
                         <div class="image-gallery">
                             <?php foreach ($productImages as $index => $image): ?>
                                 <div class="gallery-thumb <?php echo $index === 0 ? 'active' : ''; ?>" 
-                                     onclick="changeMainImage('<?php echo htmlspecialchars($image['image_path']); ?>', this)">
-                                    <img src="uploads/products/<?php echo htmlspecialchars($image['image_path']); ?>" 
+                                     onclick="changeMainImage('<?php echo htmlspecialchars($image); ?>', this)">
+                                    <img src="uploads/products/<?php echo htmlspecialchars($image); ?>" 
                                          alt="<?php echo htmlspecialchars($product['title']); ?>">
                                 </div>
                             <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
                 </div>
-                
-                <!-- Product Information Section -->
+
+                <!-- Product Information -->
                 <div class="product-info">
+                    <!-- Category Badge -->
+                    <?php if (!empty($product['category_name'])): ?>
+                        <div class="product-category category-highlight">
+                            <?php echo htmlspecialchars($product['category_name']); ?>
+                        </div>
+                    <?php endif; ?>
+
                     <h1 class="product-title"><?php echo htmlspecialchars($product['title']); ?></h1>
                     <p class="product-author">by <?php echo htmlspecialchars($product['author']); ?></p>
                     
                     <div class="product-price">$<?php echo number_format($product['price'], 2); ?></div>
-                    
-                    <div class="product-meta">
-                        <?php if (!empty($product['publisher'])): ?>
-                            <div class="meta-item">
-                                <span class="meta-label">Publisher:</span>
-                                <span class="meta-value"><?php echo htmlspecialchars($product['publisher']); ?></span>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <?php if (!empty($product['publication_date'])): ?>
-                            <div class="meta-item">
-                                <span class="meta-label">Published:</span>
-                                <span class="meta-value"><?php echo date('F j, Y', strtotime($product['publication_date'])); ?></span>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <?php if (!empty($product['pages'])): ?>
-                            <div class="meta-item">
-                                <span class="meta-label">Pages:</span>
-                                <span class="meta-value"><?php echo number_format($product['pages']); ?></span>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <div class="meta-item">
-                            <span class="meta-label">Format:</span>
-                            <span class="meta-value">Paperback</span>
-                        </div>
-                    </div>
-                    
-                    <?php if (!empty($product['description'])): ?>
-                        <div class="product-description">
-                            <h3>Description</h3>
-                            <p><?php echo nl2br(htmlspecialchars($product['description'])); ?></p>
-                        </div>
-                    <?php endif; ?>
-                    
+
+                    <!-- Stock Information -->
                     <div class="stock-info">
                         <?php if ($product['stock_quantity'] > 0): ?>
                             <span class="in-stock">✓ In Stock (<?php echo $product['stock_quantity']; ?> available)</span>
@@ -358,30 +150,15 @@ include '../sb_head.php';
                         <?php endif; ?>
                     </div>
 
-                    <!-- Quantity Selector -->
-                    <div style="margin-bottom: 25px;">
-                        <label for="qty-input" style="display: block; margin-bottom: 8px; font-weight: bold; color: #333;">
-                            Quantity:
-                        </label>
-                        <input
-                            type="number"
-                            id="qty-input"
-                            name="qty"
-                            value="1"
-                            min="1"
-                            max="<?php echo $product['stock_quantity']; ?>"
-                            style="padding: 10px; width: 100%; max-width: 120px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px;"
-                        >
-                    </div>
-
+                    <!-- Action Buttons -->
                     <div class="action-buttons">
                         <?php if ($product['stock_quantity'] > 0): ?>
                             <button class="add-to-cart-btn" 
-                                    onclick="addToCart(<?php echo $product['id']; ?>)">
+                                onclick="addToCart(<?php echo $product['id']; ?>)">
                                 Add to Cart
                             </button>
                             <button class="buy-now-btn" 
-                                    onclick="buyNow(<?php echo $product['id']; ?>)">
+                                onclick="buyNow(<?php echo $product['id']; ?>)">
                                 Buy Now
                             </button>
                         <?php else: ?>
@@ -389,16 +166,65 @@ include '../sb_head.php';
                             <button class="buy-now-btn" disabled>Notify Me</button>
                         <?php endif; ?>
                     </div>
+
+                    <!-- Product Meta Details -->
+                    <div class="product-meta-details">
+                        <div class="meta-item">
+                            <span class="meta-label">Publisher:</span>
+                            <span class="meta-value">
+                                <?php echo !empty($product['publisher']) ? htmlspecialchars($product['publisher']) : 'Not specified'; ?>
+                            </span>
+                        </div>
+                        
+                        <div class="meta-item">
+                            <span class="meta-label">Publication Date:</span>
+                            <span class="meta-value">
+                                <?php echo !empty($product['publication_date']) ? date('F j, Y', strtotime($product['publication_date'])) : 'Not specified'; ?>
+                            </span>
+                        </div>
+                        
+                        <div class="meta-item">
+                            <span class="meta-label">Pages:</span>
+                            <span class="meta-value">
+                                <?php echo !empty($product['pages']) ? number_format($product['pages']) : 'Not specified'; ?>
+                            </span>
+                        </div>
+                        
+                        <div class="meta-item">
+                            <span class="meta-label">Category:</span>
+                            <span class="meta-value">
+                                <?php echo !empty($product['category_name']) ? htmlspecialchars($product['category_name']) : 'Uncategorized'; ?>
+                            </span>
+                        </div>
+                        
+                        <div class="meta-item">
+                            <span class="meta-label">ISBN/ID:</span>
+                            <span class="meta-value">#<?php echo $product['id']; ?></span>
+                        </div>
+                    </div>
+
+                    <!-- Full Description -->
+                    <?php if (!empty($product['description'])): ?>
+                        <div class="product-description-full">
+                            <h3>Description</h3>
+                            <p><?php echo nl2br(htmlspecialchars($product['description'])); ?></p>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
+
+
+
         <?php endif; ?>
     </div>
 
     <script>
-        // Change main image when thumbnail is clicked
+        // Change main product image
         function changeMainImage(imagePath, element) {
             const mainImage = document.getElementById('mainProductImage');
-            mainImage.src = 'uploads/products/' + imagePath;
+            if (mainImage) {
+                mainImage.src = 'uploads/products/' + imagePath;
+            }
             
             // Update active thumbnail
             document.querySelectorAll('.gallery-thumb').forEach(thumb => {
@@ -406,103 +232,86 @@ include '../sb_head.php';
             });
             element.classList.add('active');
         }
-        
+
+        // Update cart badge in header
+        function updateCartBadge(cartCount) {
+            // Find the cart badge element
+            const cartBadge = document.querySelector('.cart-badge');
+            const cartIconLink = document.querySelector('.cart-icon-link');
+
+            if (cartCount > 0) {
+                if (cartBadge) {
+                    // Update existing badge
+                    cartBadge.textContent = cartCount;
+                } else if (cartIconLink) {
+                    // Create new badge if it doesn't exist
+                    const newBadge = document.createElement('span');
+                    newBadge.className = 'cart-badge';
+                    newBadge.textContent = cartCount;
+                    cartIconLink.appendChild(newBadge);
+                }
+            } else if (cartBadge) {
+                // Remove badge if cart is empty
+                cartBadge.remove();
+            }
+        }
+
         // Add to cart functionality
         function addToCart(productId) {
-    const btn = event.target;
-    const qtyInput = document.getElementById('qty-input');
-    const quantity = parseInt(qtyInput.value) || 1;
-
-    // 验证数量
-    if (quantity < 1) {
-        alert('Please enter a valid quantity');
-        return;
-    }
-
-    // ★ 防止重复点击：禁用按钮
-    btn.disabled = true;
-    const originalText = btn.textContent;
-    btn.textContent = 'Adding...';
-
-    fetch('./cart_add.php', {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: `product_id=${productId}&qty=${quantity}`
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.ok) {
-            alert(`Added ${quantity} item(s) to cart!`);
-            qtyInput.value = 1;  // 重置数量输入框
-        } else {
-            alert(data.message || 'Unable to add to cart.');
-            // 失败时重新启用按钮
-            btn.disabled = false;
-            btn.textContent = originalText;
-        }
-    })
-    .catch(() => {
-        alert('Unable to add to cart.');
-        // 失败时重新启用按钮
-        btn.disabled = false;
-        btn.textContent = originalText;
-    });
-}
-        
-        // Buy now functionality
-        function buyNow(productId) {
-            const btn = event.target;
-            const qtyInput = document.getElementById('qty-input');
-            const quantity = parseInt(qtyInput.value) || 1;
-
-            // 验证数量
-            if (quantity < 1) {
-                alert('Please enter a valid quantity');
-                return;
-            }
-
-            // ★ 防止重复点击：禁用按钮
-            btn.disabled = true;
-            const originalText = btn.textContent;
-            btn.textContent = 'Processing...';
-
-            fetch('./cart_add.php', {
+            fetch('cart_add.php', {
                 method: 'POST',
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: `product_id=${productId}&qty=${quantity}`
+                body: `product_id=${productId}&qty=1`
             })
             .then(r => r.json())
             .then(data => {
                 if (data.ok) {
+                    alert('Product added to cart!');
+                    // Update cart badge without page reload
+                    updateCartBadge(data.cartCount);
+                } else {
+                    alert(data.message || 'Unable to add to cart.');
+                }
+            })
+            .catch(() => alert('Unable to add to cart.'));
+        }
+
+        // Buy now functionality
+        function buyNow(productId) {
+            fetch('cart_add.php', {
+                method: 'POST',
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: `product_id=${productId}&qty=1`
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    // Update cart badge before redirecting
+                    updateCartBadge(data.cartCount);
                     window.location.href = 'cart_view.php';
                 } else {
                     alert(data.message || 'Unable to add to cart.');
-                    btn.disabled = false;
-                    btn.textContent = originalText;
                 }
             })
-            .catch(() => {
-                alert('Unable to add to cart.');
-                btn.disabled = false;
-                btn.textContent = originalText;
-            });
+            .catch(() => alert('Unable to add to cart.'));
         }
-        
+
         // Keyboard navigation for image gallery
         document.addEventListener('keydown', function(e) {
-            const thumbs = document.querySelectorAll('.gallery-thumb');
+            const thumbnails = document.querySelectorAll('.gallery-thumb');
+            if (thumbnails.length <= 1) return;
+
             const activeThumb = document.querySelector('.gallery-thumb.active');
-            
-            if (thumbs.length > 1 && activeThumb) {
-                let currentIndex = Array.from(thumbs).indexOf(activeThumb);
-                
-                if (e.key === 'ArrowRight') {
-                    currentIndex = (currentIndex + 1) % thumbs.length;
-                    thumbs[currentIndex].click();
-                } else if (e.key === 'ArrowLeft') {
-                    currentIndex = (currentIndex - 1 + thumbs.length) % thumbs.length;
-                    thumbs[currentIndex].click();
-                }
+            let currentIndex = Array.from(thumbnails).indexOf(activeThumb);
+
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                currentIndex = (currentIndex + 1) % thumbnails.length;
+                thumbnails[currentIndex].click();
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                currentIndex = (currentIndex - 1 + thumbnails.length) % thumbnails.length;
+                thumbnails[currentIndex].click();
             }
         });
     </script>
@@ -510,4 +319,3 @@ include '../sb_head.php';
 </html>
 <?php
 include '../sb_foot.php';
-?>

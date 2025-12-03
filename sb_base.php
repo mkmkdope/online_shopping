@@ -12,7 +12,7 @@ try{
             PDO::ATTR_EMULATE_PREPARES => false,
  ]);
 
-}catch(PDOException $e){
+}catch(PDOException $e){ 
     die("Connection failed: ".$e->getMessage());
 }
 ?>

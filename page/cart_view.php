@@ -4,6 +4,12 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// check if user already log in
+if (!isset($_SESSION['user_id'])) {
+    header('Location: /login/login.php?error=Please login to view your cart');
+    exit;
+}
+
 // Load database and helpers
 require_once __DIR__ . '/../sb_base.php';
 require_once __DIR__ . '/cart.php';
@@ -18,352 +24,464 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute([$userId]);
 $cartItems = $stmt->fetchAll();
 
-
-
 // Calculate subtotal
 $subtotal = 0;
 foreach ($cartItems as $item) {
     $product = get_product_by_id($item['product_id']);
-    if($product){
-    $subtotal += $product['price'] * $item['quantity'];
+    if ($product) {
+        $subtotal += $product['price'] * $item['quantity'];
     }
 }
+
+$_title = 'My Cart - SB Online';
+include '../sb_head.php';
 ?>
 
 <!DOCTYPE html>
 <html>
+
 <head>
-    <title>My Cart</title>
+    <title><?= $_title ?></title>
     <style>
         body {
-            font-family: Arial;
-            margin: 0;
-            padding: 0;
-            background: #f5f5f5;
+            background-color: #f9f7f2;
+            font-family: "Georgia", serif;
         }
 
-        .container {
-            width: 90%;
+        .cart-container {
             max-width: 1200px;
-            margin: auto;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 1.5rem;
+            color: #2c3e50;
+            font-size: 1rem;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .back-link:hover {
+            color: #e74c3c;
+        }
+
+        .cart-header {
+            background: white;
+            padding: 1.5rem 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 1.5rem;
             display: flex;
-            gap: 30px;
-            padding-top: 40px;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .cart-header h1 {
+            color: #2c3e50;
+            font-size: 2rem;
+            margin: 0;
+        }
+
+        .select-all-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        .select-all-wrapper input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .cart-content {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 2rem;
         }
 
         .cart-items {
-            flex: 2;
             background: white;
-            padding: 20px;
-            border-radius: 5px;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
-
-        .summary {
-            flex: 1;
-            background: white;
-            padding: 20px;
-            border-radius: 5px;
-            height: fit-content;
-            position: sticky;
-            top: 20px;
-        }
-
-        h2 { margin-top: 0; }
 
         .cart-item {
             display: flex;
-            gap: 20px;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 15px;
-            margin-bottom: 15px;
-            align-items: flex-start;
+            gap: 1.5rem;
+            padding: 1.5rem 0;
+            border-bottom: 1px solid #ecf0f1;
+            align-items: center;
+        }
+
+        .cart-item:last-child {
+            border-bottom: none;
         }
 
         .item-checkbox {
-            margin-top: 15px;
-            cursor: pointer;
             width: 20px;
             height: 20px;
+            cursor: pointer;
         }
 
         .cart-item img {
             width: 120px;
-            height: 120px;
+            height: 160px;
             object-fit: cover;
-            border-radius: 5px;
+            border-radius: 4px;
+            background: #ecf0f1;
         }
 
-        .item-details { flex: 1; }
-
-        .title {
-            font-size: 14px;
-            color: #333;
-            margin-bottom: 6px;
+        .item-details {
+            flex: 1;
         }
 
-        .price {
-            font-size: 18px;
+        .item-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+
+        .item-price {
+            font-size: 1.3rem;
             font-weight: bold;
-            margin-bottom: 6px;
+            color: #e74c3c;
+            margin-bottom: 0.5rem;
         }
 
-        .remove {
+        .item-total {
+            font-size: 1.1rem;
+            color: #2c3e50;
+            margin-bottom: 0.8rem;
+        }
+
+        .qty-selector {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
             cursor: pointer;
-              width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            color: #777;
-            transition: 0.2s;
+            font-family: "Georgia", serif;
         }
 
-        .remove:hover {
-            color: black;
+        .remove-btn {
+            cursor: pointer;
+            color: #7f8c8d;
+            font-size: 1.5rem;
+            transition: color 0.3s;
+            padding: 0.5rem;
         }
 
-        .cart-header {
+        .remove-btn:hover {
+            color: #e74c3c;
+        }
+
+        .cart-summary {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            height: fit-content;
+            position: sticky;
+            top: 2rem;
+        }
+
+        .cart-summary h2 {
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+            font-size: 1.8rem;
+        }
+
+        .summary-line {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            color: #2c3e50;
         }
 
-        .select-all-btn {
-            padding: 8px 16px;
-            background: #007bff;
+        .summary-total {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+
+        .checkout-btn {
+            width: 100%;
+            padding: 1rem;
+            background: #e74c3c;
             color: white;
             border: none;
-            border-radius: 3px;
+            border-radius: 4px;
+            font-size: 1.1rem;
+            font-weight: 600;
             cursor: pointer;
-            font-size: 14px;
-            transition: 0.2s;
+            margin-top: 1rem;
+            transition: background 0.3s;
+            font-family: "Georgia", serif;
         }
 
-        .select-all-btn:hover {
-            background: #0056b3;
+        .checkout-btn:hover {
+            background: #c0392b;
         }
 
-        .selection-counter {
-            font-size: 14px;
-            color: #666;
+        .empty-cart {
+            text-align: center;
+            padding: 3rem;
+            color: #7f8c8d;
+        }
+
+        .empty-cart h2 {
+            color: #2c3e50;
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 968px) {
+            .cart-content {
+                grid-template-columns: 1fr;
+            }
+
+            .cart-summary {
+                position: static;
+            }
+
+            .cart-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .cart-item {
+                flex-wrap: wrap;
+            }
+
+            .cart-item img {
+                width: 100%;
+                height: 200px;
+            }
         }
     </style>
 </head>
 
 <body>
-
-<a href="javascript:history.back()" 
-   style="display:inline-block; margin:20px; font-size:18px; text-decoration:none; color:#333;">
-    ← Back
-</a>
-
-<div class="container">
-    <div class="cart-items">
-        <div class="cart-header">
-            <h2 style="margin: 0;">My Bag</h2>
-            <div style="display: flex; gap: 15px; align-items: center;">
-                <button class="select-all-btn" id="select-all-btn">Select All</button>
-                <span class="selection-counter" id="selection-counter">0 of <?= count($cartItems) ?> items selected</span>
-            </div>
-        </div>
+    <div class="cart-container">
+        <a href="javascript:history.back()" class="back-link">← Back</a>
 
         <?php if (empty($cartItems)): ?>
-            <div style="text-align: center; padding: 60px 20px; color: #999;">
-                <h3 style="margin-bottom: 10px; color: #666;">Your Cart is Empty</h3>
-                <p style="margin-bottom: 20px;">No items in your cart yet. Start shopping!</p>
-                <a href="javascript:history.back()" style="display: inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 3px;">
-                    Continue Shopping
-                </a>
+            <div class="cart-items">
+                <div class="empty-cart">
+                    <h2>Your Cart is Empty</h2>
+                    <p>Start adding some books to your cart!</p>
+                    <a href="/page/product_view.php" style="display: inline-block; margin-top: 1rem; padding: 0.8rem 2rem; background: #e74c3c; color: white; text-decoration: none; border-radius: 4px;">Browse Books</a>
+                </div>
             </div>
-        <?php endif; ?>
+        <?php else: ?>
+            <div class="cart-header">
+                <h1>My Shopping Cart</h1>
+                <label class="select-all-wrapper">
+                    <input type="checkbox" id="select-all">
+                    <span>Select All</span>
+                </label>
+            </div>
 
-        <?php foreach ($cartItems as $item): ?>
-            <?php $product = get_product_by_id($item['product_id']); ?>
+            <div class="cart-content">
+                <div class="cart-items">
+                    <?php foreach ($cartItems as $item): ?>
+                        <?php $product = get_product_by_id($item['product_id']); ?>
+                        <div class="cart-item">
+                            <input type="checkbox" class="item-checkbox" data-product-id="<?= $item['product_id'] ?>">
 
-            <div class="cart-item">
-                <input
-                    type="checkbox"
-                    class="item-checkbox"
-                    data-product-id="<?= $item['product_id'] ?>"
-                    checked
-                >
-                <img src="../images/<?= $product['cover_image'] ?>" alt="">
+                            <img src="uploads/products/<?= $product['cover_image'] ?>" alt="">
 
-                <div class="item-details">
-                    <div class="price">RM<?= number_format($product['price'], 2) ?></div>
-                    <?php $lineTotal = $product['price'] * $item['quantity']; ?>
-                    <div class="line-total" data-line-total="<?= number_format($lineTotal, 2, '.', '') ?>">
-                        RM<?= number_format($lineTotal, 2) ?>
-                    </div>
-                    <div class="title"><?= htmlspecialchars($product['title']) ?></div>
+                            <div class="item-details">
+                                <div class="item-title"><?= htmlspecialchars($product['title']) ?></div>
+                                <div class="item-price">RM<?= number_format($product['price'], 2) ?></div>
+                                <?php $lineTotal = $product['price'] * $item['quantity']; ?>
+                                <div class="item-total line-total" data-line-total="<?= number_format($lineTotal, 2, '.', '') ?>">
+                                    Total: RM<?= number_format($lineTotal, 2) ?>
+                                </div>
+                                <div>
+                                    Qty:
+                                    <select class="qty-selector"
+                                        data-product-id="<?= $item['product_id'] ?>"
+                                        data-price="<?= number_format($product['price'], 2, '.', '') ?>"
+                                        data-stock="<?= $product['stock_quantity'] ?>">
 
-                    <div>
-                        Qty:
-                        <select
-                            class="qty-selector"
-                            style="padding:4px;"
-                            data-product-id="<?= $item['product_id'] ?>"
-                            data-price="<?= number_format($product['price'], 2, '.', '') ?>"
-                        >
-                            <?php for($i = 1; $i <= 10; $i++): ?>
-                                <option value="<?= $i ?>" <?= $i == $item['quantity'] ? 'selected' : '' ?>>
-                                    <?= $i ?>
-                                </option>
-                            <?php endfor; ?>
-                        </select>
-                    </div>
+                                        <?php
+                                        $max = $product['stock_quantity'];
+                                        for ($i = 1; $i <= $max; $i++): ?>
+                                            <option value="<?= $i ?>" <?= $i == $item['quantity'] ? 'selected' : '' ?>>
+                                                <?= $i ?>
+                                            </option>
+                                        <?php endfor; ?>
+                                    </select>
+
+                                </div>
+                            </div>
+
+                            <div class="remove-btn" data-product-id="<?= $item['product_id'] ?>">×</div>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
 
-                <div class="remove" data-product-id="<?= $item['product_id'] ?>">×</div>
+                <div class="cart-summary">
+                    <h2>Order Summary</h2>
+                    <div class="summary-line">
+                        <span>Subtotal:</span>
+                        <span id="cart-subtotal" class="summary-total">RM0.00</span>
+                    </div>
+
+                    <form id="checkout-form" action="payment.php" method="POST">
+                        <input type="hidden" id="selected-items-input" name="selected_items" value="">
+                        <button type="button" id="checkout-btn" class="checkout-btn">
+                            PROCEED TO CHECKOUT
+                        </button>
+                    </form>
+                </div>
             </div>
-
-        <?php endforeach; ?>
+        <?php endif; ?>
     </div>
 
-    <div class="summary">
-        <h2>Total</h2>
-        <p>Sub-total: <span id="cart-subtotal">RM<?= number_format($subtotal, 2) ?></span></p>
-
-        <button style="width:100%; padding:10px; background:green; color:white; border:none; border-radius:3px; font-size:18px;">
-            CHECKOUT
-        </button>
-    </div>
-</div>
-
-<script>
-// Remove item
-document.querySelectorAll('.remove').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const productId = btn.dataset.productId;
-        fetch('../cart_delete.php?product_id=' + productId)
-            .then(res => res.text())
-            .then(data => {
-                if(data.includes('deleted')){
-                    location.reload();
-                } else {
-                    alert('Error: Failed to delete');
+    <script>
+        // Remove item
+        document.querySelectorAll('.remove-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (confirm('Remove this item from cart?')) {
+                    const productId = btn.dataset.productId;
+                    fetch('cart_delete.php?product_id=' + productId)
+                        .then(res => res.text())
+                        .then(data => {
+                            if (data.includes('deleted')) {
+                                location.reload();
+                            } else {
+                                alert('Error: Failed to delete');
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Error:', err);
+                            alert('Failed to delete item');
+                        });
                 }
-            })
-            .catch(err => {
-                console.error('Error:', err);
-                alert('Failed to delete item');
             });
-    });
-});
+        });
 
+        const qtySelectors = document.querySelectorAll('.qty-selector');
+        const subtotalEl = document.getElementById('cart-subtotal');
 
-// Update quantity
-
-const qtySelectors = document.querySelectorAll('.qty-selector');
-const subtotalEl = document.getElementById('cart-subtotal');
-const selectionCounterEl = document.getElementById('selection-counter');
-const selectAllBtn = document.getElementById('select-all-btn');
-
-function updateSubtotal() {
-    let subtotal = 0;
-    let checkedCount = 0;
-    let totalCount = 0;
-
-    document.querySelectorAll('.cart-item').forEach(cartItem => {
-        const checkbox = cartItem.querySelector('.item-checkbox');
-        const lineEl = cartItem.querySelector('.line-total');
-        if (checkbox && lineEl) {
-            totalCount++;
-            if (checkbox.checked) {
-                checkedCount++;
+        function updateSubtotal() {
+            let subtotal = 0;
+            document.querySelectorAll('.item-checkbox:checked').forEach(checkbox => {
+                const cartItem = checkbox.closest('.cart-item');
+                const lineEl = cartItem.querySelector('.line-total');
                 const amount = parseFloat(lineEl.dataset.lineTotal || '0');
                 if (!isNaN(amount)) {
                     subtotal += amount;
                 }
+            });
+            if (subtotalEl) {
+                subtotalEl.textContent = 'RM' + subtotal.toFixed(2);
             }
         }
-    });
 
-    if (subtotalEl) {
-        subtotalEl.textContent = 'RM' + subtotal.toFixed(2);
-    }
+        qtySelectors.forEach(select => {
+            select.addEventListener('change', event => {
 
-    if (selectionCounterEl) {
-        selectionCounterEl.textContent = checkedCount + ' of ' + totalCount + ' items selected';
-    }
+                const price = parseFloat(event.target.dataset.price);
+                const quantity = parseInt(event.target.value, 10);
+                const productId = event.target.dataset.productId;
+                const stock = parseInt(event.target.dataset.stock, 10);
 
-    // Update button text based on selection state
-    if (selectAllBtn) {
-        selectAllBtn.textContent = checkedCount === totalCount && totalCount > 0 ? 'Deselect All' : 'Select All';
-    }
-}
+                // ① 前端阻止超过库存
+                if (quantity > stock) {
+                    alert("Quantity exceeds stock! Maximum available: " + stock);
+                    event.target.value = stock;
+                    return;
+                }
 
-qtySelectors.forEach(select => {
-    select.addEventListener('change', event => {
-        const price = parseFloat(event.target.dataset.price || '0');
-        const quantity = parseInt(event.target.value, 10) || 0;
-        const lineTotal = price * quantity;
-        const lineTotalEl = event.target.closest('.cart-item').querySelector('.line-total');
+                // ② 前端更新 line total
+                const lineTotal = price * quantity;
+                const lineTotalEl = event.target.closest('.cart-item').querySelector('.line-total');
+                lineTotalEl.dataset.lineTotal = lineTotal.toFixed(2);
+                lineTotalEl.textContent = 'Total: RM' + lineTotal.toFixed(2);
 
-        if (lineTotalEl) {
-            lineTotalEl.dataset.lineTotal = lineTotal.toFixed(2);
-            lineTotalEl.textContent = 'RM' + lineTotal.toFixed(2);
-        }
+                updateSubtotal();
 
-        updateSubtotal();
-
-        // 防止重复点击：禁用select
-        const currentSelect = event.target;
-        currentSelect.disabled = true;
-
-        // 提交新数量到后端
-        fetch('../cart_update.php', {
-            method: 'POST',
-            body: new URLSearchParams({
-                product_id: event.target.dataset.productId,
-                quantity: quantity
-            })
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (!data.ok) {
-                alert(data.message || 'Failed to update cart');
-                // 失败时刷新页面恢复数据
-                location.reload();
-            }
-        })
-        .catch(err => {
-            console.error('Error:', err);
-            alert('Failed to update cart');
-            location.reload();
-        })
-        .finally(() => {
-            // 不管成功失败，都重新启用select
-            currentSelect.disabled = false;
+                // ③ AJAX 发送到后端
+                fetch('cart_update.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        },
+                        body: new URLSearchParams({
+                            product_id: productId,
+                            quantity: quantity
+                        })
+                    })
+                    .then(res => res.text())
+                    .then(res => {
+                        if (res === "exceed_stock") {
+                            alert("Server: Quantity exceeds stock. Please refresh.");
+                            event.target.value = stock;
+                        }
+                    })
+                    .catch(err => console.error(err));
+            });
         });
-    });
-});
 
-// Handle checkbox changes
-document.querySelectorAll('.item-checkbox').forEach(checkbox => {
-    checkbox.addEventListener('change', () => {
-        updateSubtotal();
-    });
-});
 
-// Handle Select All button
-selectAllBtn.addEventListener('click', () => {
-    const allCheckboxes = document.querySelectorAll('.item-checkbox');
-    const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
+        const selectAllCheckbox = document.getElementById('select-all');
+        const itemCheckboxes = document.querySelectorAll('.item-checkbox');
 
-    // Toggle: if all are checked, uncheck all; otherwise, check all
-    allCheckboxes.forEach(checkbox => {
-        checkbox.checked = !allChecked;
-    });
+        if (selectAllCheckbox && itemCheckboxes.length > 0) {
+            selectAllCheckbox.addEventListener('change', function() {
+                itemCheckboxes.forEach(checkbox => {
+                    checkbox.checked = selectAllCheckbox.checked;
+                });
+                updateSubtotal();
+            });
 
-    updateSubtotal();
-});
+            itemCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const allChecked = Array.from(itemCheckboxes).every(cb => cb.checked);
+                    const someChecked = Array.from(itemCheckboxes).some(cb => cb.checked);
 
-updateSubtotal();
-</script>
+                    selectAllCheckbox.checked = allChecked;
+                    selectAllCheckbox.indeterminate = someChecked && !allChecked;
 
+                    updateSubtotal();
+                });
+            });
+
+            const checkoutBtn = document.getElementById('checkout-btn');
+            if (checkoutBtn) {
+                checkoutBtn.addEventListener('click', function() {
+                    const selectedProductIds = [];
+                    document.querySelectorAll('.item-checkbox:checked').forEach(checkbox => {
+                        selectedProductIds.push(checkbox.dataset.productId);
+                    });
+
+                    if (selectedProductIds.length === 0) {
+                        alert('Please select at least one item to checkout');
+                        return;
+                    }
+
+                    document.getElementById('selected-items-input').value = JSON.stringify(selectedProductIds);
+                    document.getElementById('checkout-form').submit();
+                });
+            }
+
+            updateSubtotal();
+        }
+    </script>
 </body>
+
 </html>
+
+<?php include '../sb_foot.php'; ?>
