@@ -1,36 +1,192 @@
 <?php
-// Start session safely
+// Handle Stripe success redirect: confirm payment, create order, and show receipt.
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
     header('Location: /login/login.php');
     exit;
 }
 
-// Get payment details
+require_once __DIR__ . '/../sb_base.php';
+require_once __DIR__ . '/cart.php';
+require_once __DIR__ . '/product_functions.php';
+
+$sessionId = $_GET['session_id'] ?? '';
+
+// Fallback for old flow
 $referenceNo = $_GET['ref'] ?? '';
 $paymentId = $_GET['payment_id'] ?? '';
 
-if (empty($referenceNo) || empty($paymentId)) {
+// If no session id and no legacy params, bail out
+if (empty($sessionId) && (empty($referenceNo) || empty($paymentId))) {
     header('Location: /index.php');
     exit;
 }
 
-// Load database
-require_once __DIR__ . '/../sb_base.php';
+// Legacy display (if already paid by old flow)
+if (empty($sessionId) && !empty($paymentId) && !empty($referenceNo)) {
+    $sql = "SELECT * FROM payment WHERE payment_id = ? AND reference_no = ?";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$paymentId, $referenceNo]);
+    $payment = $stmt->fetch();
+    if (!$payment) {
+        header('Location: /index.php');
+        exit;
+    }
+} else {
+    // New Stripe Checkout flow
+    if (empty($stripeSecretKey)) {
+        die('Stripe secret key not configured.');
+    }
 
-// Get payment details from database
-$sql = "SELECT * FROM payment WHERE payment_id = ? AND reference_no = ?";
-$stmt = $pdo->prepare($sql);
-$stmt->execute([$paymentId, $referenceNo]);
-$payment = $stmt->fetch();
+    $pending = $_SESSION['pending_checkout'] ?? null;
+    if (!$pending || ($pending['session_id'] ?? '') !== $sessionId) {
+        header('Location: /cart_view.php?error=Payment session not found or expired.');
+        exit;
+    }
 
-if (!$payment) {
-    header('Location: /index.php');
-    exit;
+    // Fetch Checkout Session from Stripe to verify status
+    $stripeResponse = null;
+    $ch = curl_init("https://api.stripe.com/v1/checkout/sessions/" . urlencode($sessionId) . "?expand[]=payment_intent");
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
+        CURLOPT_USERPWD => $stripeSecretKey . ':',
+    ]);
+    $stripeRaw = curl_exec($ch);
+    $stripeHttp = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($stripeRaw === false || $stripeHttp >= 300) {
+        error_log('Unable to fetch Stripe session: ' . $stripeRaw);
+        header('Location: /cart_view.php?error=Unable to verify payment.');
+        exit;
+    }
+    $stripeResponse = json_decode($stripeRaw, true);
+    if (($stripeResponse['payment_status'] ?? '') !== 'paid') {
+        header('Location: /cart_view.php?error=Payment not completed.');
+        exit;
+    }
+
+    $paymentIntentId = $stripeResponse['payment_intent']['id'] ?? ($stripeResponse['payment_intent'] ?? $sessionId);
+    $paymentAmount = isset($stripeResponse['amount_total']) ? ($stripeResponse['amount_total'] / 100) : ($pending['total_amount'] ?? 0);
+
+    // Avoid double-processing if payment already stored
+    $existingPaymentStmt = $pdo->prepare("SELECT * FROM payment WHERE reference_no = ? LIMIT 1");
+    $existingPaymentStmt->execute([$paymentIntentId]);
+    $payment = $existingPaymentStmt->fetch();
+
+    if (!$payment) {
+        try {
+            $pdo->beginTransaction();
+
+            $userId = $_SESSION['user_id'];
+            $orderNumber = 'ORD-' . date('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
+
+            $orderSql = "INSERT INTO orders (user_id, order_number, total_amount, status, payment_status, 
+                         shipping_name, shipping_email, shipping_phone, shipping_address, created_at) 
+                         VALUES (?, ?, ?, 'processing', 'paid', ?, ?, ?, ?, NOW())";
+
+            $orderStmt = $pdo->prepare($orderSql);
+            $orderStmt->execute([
+                $userId,
+                $orderNumber,
+                $paymentAmount,
+                $pending['full_name'] ?? '',
+                $pending['email'] ?? '',
+                $pending['phone'] ?? '',
+                $pending['address'] ?? '',
+            ]);
+
+            $orderId = $pdo->lastInsertId();
+
+            $selectedProductIds = $pending['selected_product_ids'] ?? [];
+            $cartUserId = cart_user_id();
+            $totalAmount = 0;
+
+            foreach ($selectedProductIds as $productId) {
+                $cartSql = "SELECT * FROM cart_items WHERE user_id = ? AND product_id = ?";
+                $cartStmt = $pdo->prepare($cartSql);
+                $cartStmt->execute([$cartUserId, $productId]);
+                $cartItem = $cartStmt->fetch();
+                if (!$cartItem) {
+                    continue;
+                }
+
+                $product = get_product_by_id($productId);
+                if (!$product) {
+                    continue;
+                }
+
+                $subtotal = $product['price'] * $cartItem['quantity'];
+                $totalAmount += $subtotal;
+
+                $itemSql = "INSERT INTO order_items (order_id, product_id, product_title, product_price, quantity, subtotal, created_at) 
+                            VALUES (?, ?, ?, ?, ?, ?, NOW())";
+                $itemStmt = $pdo->prepare($itemSql);
+                $itemStmt->execute([
+                    $orderId,
+                    $productId,
+                    $product['title'],
+                    $product['price'],
+                    $cartItem['quantity'],
+                    $subtotal
+                ]);
+
+                // Update product stock
+                $newquantity = $product['stock_quantity'] - $cartItem['quantity'];
+                $updateQuantitySql = "UPDATE products SET stock_quantity = ? WHERE id = ?";
+                $updateQuantityStmt = $pdo->prepare($updateQuantitySql);
+                $updateQuantityStmt->execute([$newquantity, $productId]);
+            }
+
+            // Insert payment record
+            $paymentSql = "INSERT INTO payment (order_id, amount, method, status, reference_no, transaction_time, created_at) 
+                           VALUES (?, ?, ?, 'SUCCESS', ?, NOW(), NOW())";
+
+            $paymentStmt = $pdo->prepare($paymentSql);
+            $paymentStmt->execute([
+                $orderId,
+                $totalAmount ?: $paymentAmount,
+                'Stripe Checkout',
+                $paymentIntentId
+            ]);
+
+            $paymentId = $pdo->lastInsertId();
+
+            // Remove purchased items from cart
+            foreach ($selectedProductIds as $productId) {
+                cart_remove_item($productId);
+            }
+
+            $pdo->commit();
+
+            // Build payment record for display
+            $payment = [
+                'payment_id' => $paymentId,
+                'reference_no' => $paymentIntentId,
+                'method' => 'Stripe Checkout',
+                'status' => 'SUCCESS',
+                'amount' => $totalAmount ?: $paymentAmount,
+                'transaction_time' => date('Y-m-d H:i:s'),
+            ];
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('Payment success handling failed: ' . $e->getMessage());
+            header('Location: /cart_view.php?error=Failed to finalize order.');
+            exit;
+        }
+    }
+
+    // Clear pending checkout context
+    unset($_SESSION['pending_checkout']);
+
+    // Align output variables
+    $referenceNo = $payment['reference_no'];
+    $paymentId = $payment['payment_id'] ?? '';
 }
 
 $_title = 'Payment Successful - SB Online';

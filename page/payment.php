@@ -1,4 +1,5 @@
 <?php
+
 // Start session safely
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -331,43 +332,14 @@ include '../sb_head.php';
                 <form id="payment-form" action="payment_process.php" method="POST">
                     <input type="hidden" name="total_amount" value="<?= number_format($totalAmount, 2, '.', '') ?>">
                     <input type="hidden" name="selected_items" value="<?= htmlspecialchars($_POST['selected_items']) ?>">
+                    <input type="hidden" name="payment_method" value="Stripe Checkout">
                     
                     <div class="form-section">
                         <h3>Payment Method</h3>
                         <div class="payment-methods">
                             <div class="payment-method">
-                                <input type="radio" name="payment_method" id="credit_card" value="Credit Card" required>
-                                <label for="credit_card">💳 Credit Card</label>
-                            </div>
-                            <div class="payment-method">
-                                <input type="radio" name="payment_method" id="debit_card" value="Debit Card">
-                                <label for="debit_card">💳 Debit Card</label>
-                            </div>
-                            <div class="payment-method">
-                                <input type="radio" name="payment_method" id="online_banking" value="Online Banking">
-                                <label for="online_banking">🏦 Online Banking</label>
-                            </div>
-                            <div class="payment-method">
-                                <input type="radio" name="payment_method" id="ewallet" value="E-Wallet">
-                                <label for="ewallet">📱 E-Wallet</label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-section" id="card-details">
-                        <h3>Card Information</h3>
-                        <div class="form-group">
-                            <label for="card_number">Card Number</label>
-                            <input type="text" id="card_number" name="card_number" placeholder="1234 5678 9012 3456" maxlength="19">
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="expiry_date">Expiry Date</label>
-                                <input type="text" id="expiry_date" name="expiry_date" placeholder="MM/YY" maxlength="5">
-                            </div>
-                            <div class="form-group">
-                                <label for="cvv">CVV</label>
-                                <input type="text" id="cvv" name="cvv" placeholder="123" maxlength="4">
+                                <input type="radio" name="payment_method_display" id="credit_card" value="Card" checked>
+                                <label for="credit_card">💳 Pay with Card (Stripe Checkout)</label>
                             </div>
                         </div>
                     </div>
@@ -429,40 +401,30 @@ include '../sb_head.php';
         </div>
     </div>
 
+    <script src="https://js.stripe.com/v3/"></script>
     <script>
-        // Auto-format card number
-        document.getElementById('card_number').addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\s/g, '');
-            let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
-            e.target.value = formattedValue;
-        });
+        const stripe = Stripe('pk_test_51SXhfm9YDXhXkkofqgza7axWsDIzLGMLV2CeLm64DIkFLNHuvtm5JceEa0BuYvqRJYPS0N6bS8EYyx4fXNO7CBAL00LNqXVMWc');
+        const form = document.getElementById('payment-form');
 
-        // Auto-format expiry date
-        document.getElementById('expiry_date').addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\D/g, '');
-            if (value.length >= 2) {
-                value = value.substring(0, 2) + '/' + value.substring(2, 4);
-            }
-            e.target.value = value;
-        });
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(form);
 
-        // Only allow numbers in CVV
-        document.getElementById('cvv').addEventListener('input', function(e) {
-            e.target.value = e.target.value.replace(/\D/g, '');
-        });
-
-        // Show/hide card details based on payment method
-        const paymentMethods = document.querySelectorAll('input[name="payment_method"]');
-        const cardDetails = document.getElementById('card-details');
-
-        paymentMethods.forEach(method => {
-            method.addEventListener('change', function() {
-                if (this.value === 'Credit Card' || this.value === 'Debit Card') {
-                    cardDetails.style.display = 'block';
-                } else {
-                    cardDetails.style.display = 'none';
-                }
+            const resp = await fetch('payment_process.php', {
+                method: 'POST',
+                body: formData
             });
+
+            const result = await resp.json();
+            if (result.error) {
+                alert(result.error);
+                return;
+            }
+
+            const { error } = await stripe.redirectToCheckout({ sessionId: result.sessionId });
+            if (error) {
+                alert(error.message);
+            }
         });
     </script>
 </body>

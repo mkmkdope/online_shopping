@@ -24,7 +24,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute([$userId]);
 $cartItems = $stmt->fetchAll();
 
-// Calculate subtotal
+// Calculate subtotal (initial)
 $subtotal = 0;
 foreach ($cartItems as $item) {
     $product = get_product_by_id($item['product_id']);
@@ -398,14 +398,14 @@ include '../sb_head.php';
                 const productId = event.target.dataset.productId;
                 const stock = parseInt(event.target.dataset.stock, 10);
 
-                // ① 前端阻止超过库存
+                // Frontend guard: not exceed stock
                 if (quantity > stock) {
                     alert("Quantity exceeds stock! Maximum available: " + stock);
                     event.target.value = stock;
                     return;
                 }
 
-                // ② 前端更新 line total
+                // Update line total in UI
                 const lineTotal = price * quantity;
                 const lineTotalEl = event.target.closest('.cart-item').querySelector('.line-total');
                 lineTotalEl.dataset.lineTotal = lineTotal.toFixed(2);
@@ -413,7 +413,7 @@ include '../sb_head.php';
 
                 updateSubtotal();
 
-                // ③ AJAX 发送到后端
+                // Persist to server
                 fetch('cart_update.php', {
                         method: 'POST',
                         headers: {

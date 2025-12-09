@@ -1,160 +1,149 @@
 <?php
-// Start session safely
+// Create Stripe Checkout Session and return sessionId for redirect.
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
     header('Location: /login/login.php?error=Please login to proceed');
     exit;
 }
 
-// Load database and helpers
 require_once __DIR__ . '/../sb_base.php';
 require_once __DIR__ . '/cart.php';
 require_once __DIR__ . '/product_functions.php';
 
-// Check if form submitted
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: cart_view.php');
     exit;
 }
 
-// Get form data
-$totalAmount = $_POST['total_amount'] ?? 0;
-$paymentMethod = $_POST['payment_method'] ?? '';
-$selectedItems = $_POST['selected_items'] ?? '';
+$selectedItemsRaw = $_POST['selected_items'] ?? '';
+$selectedProductIds = json_decode($selectedItemsRaw, true);
 $fullName = $_POST['full_name'] ?? '';
 $email = $_POST['email'] ?? '';
 $phone = $_POST['phone'] ?? '';
 $address = $_POST['address'] ?? '';
 
-// Validate required fields
-if (empty($totalAmount) || empty($paymentMethod) || empty($selectedItems)) {
-    header('Location: payment.php?error=Missing required fields');
+if (empty($selectedProductIds) || !is_array($selectedProductIds)) {
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'No items selected.']);
     exit;
 }
 
-try {
-    // Start transaction
-    $pdo->beginTransaction();
+// Build line items from DB to avoid client tampering
+$cartUserId = cart_user_id();
+$lineItems = [];
+$cartSummary = [];
+$totalAmount = 0;
 
-    $userId = $_SESSION['user_id'];
-
-    // Verify user exists in database
-    $userCheckSql = "SELECT id FROM users WHERE id = ?";
-    $userCheckStmt = $pdo->prepare($userCheckSql);
-    $userCheckStmt->execute([$userId]);
-    $userExists = $userCheckStmt->fetch();
-
-    if (!$userExists) {
-        throw new Exception('User account not found. Please log in again.');
+foreach ($selectedProductIds as $productId) {
+    $cartStmt = $pdo->prepare("SELECT * FROM cart_items WHERE user_id = ? AND product_id = ?");
+    $cartStmt->execute([$cartUserId, $productId]);
+    $cartItem = $cartStmt->fetch();
+    if (!$cartItem) {
+        continue;
     }
 
-    // Generate unique order number
-    $orderNumber = 'ORD-' . date('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
-
-    // Create order
-    $orderSql = "INSERT INTO orders (user_id, order_number, total_amount, status, payment_status, 
-                 shipping_name, shipping_email, shipping_phone, shipping_address, created_at) 
-                 VALUES (?, ?, ?, 'processing', 'paid', ?, ?, ?, ?, NOW())";
-
-    $orderStmt = $pdo->prepare($orderSql);
-    $orderStmt->execute([
-        $userId,
-        $orderNumber,
-        $totalAmount,
-        $fullName,
-        $email,
-        $phone,
-        $address
-    ]);
-
-    $orderId = $pdo->lastInsertId();
-
-    // Get selected items and create order items
-    $selectedProductIds = json_decode($selectedItems, true);
-    $cartUserId = cart_user_id();
-
-    foreach ($selectedProductIds as $productId) {
-        // Get cart item
-        $cartSql = "SELECT * FROM cart_items WHERE user_id = ? AND product_id = ?";
-        $cartStmt = $pdo->prepare($cartSql);
-        $cartStmt->execute([$cartUserId, $productId]);
-        $cartItem = $cartStmt->fetch();
-
-        if ($cartItem) {
-            // Get product details
-            $product = get_product_by_id($productId);
-
-            if ($product) {
-                $subtotal = $product['price'] * $cartItem['quantity'];
-
-                // Insert order item
-                $itemSql = "INSERT INTO order_items (order_id, product_id, product_title, product_price, quantity, subtotal, created_at) 
-                            VALUES (?, ?, ?, ?, ?, ?, NOW())";
-                $itemStmt = $pdo->prepare($itemSql);
-                $itemStmt->execute([
-                    $orderId,
-                    $productId,
-                    $product['title'],
-                    $product['price'],
-                    $cartItem['quantity'],
-                    $subtotal
-                ]);
-//  //remove the product quantity from database
-$newquantity = $product['stock_quantity'] - $cartItem['quantity'];
-$updateQuantitySql = "UPDATE products SET stock_quantity = ? WHERE id = ?";
-$updateQuantityStmt = $pdo->prepare($updateQuantitySql);
-$updateQuantityStmt->execute([$newquantity, $productId]);
-            }
-        }
+    $product = get_product_by_id($productId);
+    if (!$product) {
+        continue;
     }
 
-    // Generate unique payment reference number
-    $referenceNo = 'PAY-' . strtoupper(bin2hex(random_bytes(6)));
+    $quantity = (int) $cartItem['quantity'];
+    $unitPrice = (float) $product['price'];
+    $lineTotal = $unitPrice * $quantity;
+    $totalAmount += $lineTotal;
 
-    // Insert payment record
-    $paymentSql = "INSERT INTO payment (order_id, amount, method, status, reference_no, transaction_time, created_at) 
-                   VALUES (?, ?, ?, 'SUCCESS', ?, NOW(), NOW())";
+    $lineItems[] = [
+        'price_data' => [
+            'currency' => 'myr',
+            'product_data' => ['name' => $product['title']],
+            'unit_amount' => (int) round($unitPrice * 100),
+        ],
+        'quantity' => $quantity,
+    ];
 
-    $paymentStmt = $pdo->prepare($paymentSql);
-    $paymentStmt->execute([
-        $orderId,
-        $totalAmount,
-        $paymentMethod,
-        $referenceNo
-    ]);
+    $cartSummary[] = [
+        'product_id' => $productId,
+        'title' => $product['title'],
+        'price' => $unitPrice,
+        'quantity' => $quantity,
+    ];
+}
 
-    $paymentId = $pdo->lastInsertId();
-
-    // Remove purchased items from cart
-    foreach ($selectedProductIds as $productId) {
-        cart_remove_item($productId);
-    }
-
- 
-
-
-
-
-    // Commit transaction
-    $pdo->commit();
-
-    // Redirect to success page
-    header('Location: payment_success.php?ref=' . $referenceNo . '&payment_id=' . $paymentId);
-    exit;
-} catch (Exception $e) {
-    // Rollback on error
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
-
-    error_log('Payment processing error: ' . $e->getMessage());
-
-    // User-friendly error message
-    $errorMsg = urlencode('Payment processing failed. Please try again or contact support.');
-    header('Location: cart_view.php?error=' . $errorMsg);
+if (empty($lineItems)) {
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'No valid items found.']);
     exit;
 }
+
+// Build absolute URLs for redirect
+$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$baseUrl = $scheme . '://' . $host;
+$successUrl = $baseUrl . '/page/payment_success.php?session_id={CHECKOUT_SESSION_ID}';
+$cancelUrl = $baseUrl . '/page/cart_view.php?cancel=1';
+
+// Flatten payload for Stripe Checkout (without stripe-php)
+$payload = [
+    'mode' => 'payment',
+    'payment_method_types[0]' => 'card',
+    'success_url' => $successUrl,
+    'cancel_url' => $cancelUrl,
+    'customer_email' => $email,
+];
+
+foreach ($lineItems as $index => $item) {
+    $payload["line_items[$index][price_data][currency]"] = $item['price_data']['currency'];
+    $payload["line_items[$index][price_data][product_data][name]"] = $item['price_data']['product_data']['name'];
+    $payload["line_items[$index][price_data][unit_amount]"] = $item['price_data']['unit_amount'];
+    $payload["line_items[$index][quantity]"] = $item['quantity'];
+}
+
+// Optional metadata
+$payload['metadata[user_id]'] = (string) $_SESSION['user_id'];
+
+// Create Stripe Checkout Session via cURL
+$ch = curl_init('https://api.stripe.com/v1/checkout/sessions');
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => http_build_query($payload),
+    CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
+    CURLOPT_USERPWD => $stripeSecretKey . ':',
+]);
+
+$response = curl_exec($ch);
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$curlErr = curl_error($ch);
+curl_close($ch);
+
+header('Content-Type: application/json');
+
+if ($response === false || $httpCode >= 300) {
+    error_log('Stripe session creation failed: ' . $curlErr . ' Response: ' . $response);
+    echo json_encode(['error' => 'Unable to create Stripe Checkout Session. Please try again.']);
+    exit;
+}
+
+$sessionData = json_decode($response, true);
+if (empty($sessionData['id'])) {
+    error_log('Stripe session missing id: ' . $response);
+    echo json_encode(['error' => 'Invalid response from payment gateway.']);
+    exit;
+}
+
+// Save checkout context for success page to finalize order
+$_SESSION['pending_checkout'] = [
+    'session_id' => $sessionData['id'],
+    'selected_product_ids' => $selectedProductIds,
+    'full_name' => $fullName,
+    'email' => $email,
+    'phone' => $phone,
+    'address' => $address,
+    'total_amount' => $totalAmount,
+];
+
+echo json_encode(['sessionId' => $sessionData['id']]);
+exit;

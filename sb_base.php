@@ -15,4 +15,6 @@ try{
 }catch(PDOException $e){ 
     die("Connection failed: ".$e->getMessage());
 }
+
+$stripeSecretKey = getenv('STRIPE_SECRET_KEY') ?: 'sk_test_51SXhfm9YDXhXkkofv44eXmPCDH1LWPDuXuTqrCYUCDkiU0NRUU1gtFaJ3tCvM3GnpOpIpnrjOl1hmnJzIm8OBRNE00OogG9FS0';
 ?>

@@ -4,6 +4,8 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../sb_base.php';
+require_once __DIR__ . '/product_functions.php';
+
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(403);
