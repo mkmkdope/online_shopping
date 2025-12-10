@@ -25,6 +25,9 @@ $email = $_POST['email'] ?? '';
 $phone = $_POST['phone'] ?? '';
 $address = $_POST['address'] ?? '';
 
+$discountAmount = floatval($_POST['discount_amount'] ?? 0);
+$discountCode   = $_POST['discount_code_used'] ?? '';
+
 if (empty($selectedProductIds) || !is_array($selectedProductIds)) {
     header('Content-Type: application/json');
     echo json_encode(['error' => 'No items selected.']);
@@ -33,76 +36,59 @@ if (empty($selectedProductIds) || !is_array($selectedProductIds)) {
 
 // Build line items from DB to avoid client tampering
 $cartUserId = cart_user_id();
-$lineItems = [];
-$cartSummary = [];
 $totalAmount = 0;
+$lineItemsForMetadata = [];
+
 
 foreach ($selectedProductIds as $productId) {
     $cartStmt = $pdo->prepare("SELECT * FROM cart_items WHERE user_id = ? AND product_id = ?");
     $cartStmt->execute([$cartUserId, $productId]);
     $cartItem = $cartStmt->fetch();
-    if (!$cartItem) {
-        continue;
-    }
+    if (!$cartItem) continue;
 
     $product = get_product_by_id($productId);
-    if (!$product) {
-        continue;
-    }
+    if (!$product) continue;
 
     $quantity = (int) $cartItem['quantity'];
     $unitPrice = (float) $product['price'];
     $lineTotal = $unitPrice * $quantity;
     $totalAmount += $lineTotal;
 
-    $lineItems[] = [
-        'price_data' => [
-            'currency' => 'myr',
-            'product_data' => ['name' => $product['title']],
-            'unit_amount' => (int) round($unitPrice * 100),
-        ],
-        'quantity' => $quantity,
-    ];
-
-    $cartSummary[] = [
-        'product_id' => $productId,
+    $lineItemsForMetadata[] = [
+        'id' => $productId,
         'title' => $product['title'],
-        'price' => $unitPrice,
         'quantity' => $quantity,
+        'unit_price' => $unitPrice
     ];
 }
 
-if (empty($lineItems)) {
+if ($totalAmount <= 0) {
     header('Content-Type: application/json');
-    echo json_encode(['error' => 'No valid items found.']);
+    echo json_encode(['error' => 'Invalid cart total.']);
     exit;
 }
 
-// Build absolute URLs for redirect
-$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$baseUrl = $scheme . '://' . $host;
-$successUrl = $baseUrl . '/page/payment_success.php?session_id={CHECKOUT_SESSION_ID}';
-$cancelUrl = $baseUrl . '/page/cart_view.php?cancel=1';
 
-// Flatten payload for Stripe Checkout (without stripe-php)
+$finalAmountCents = (int) round(($totalAmount - $discountAmount) * 100);
+$finalAmountCents = max(0, $finalAmountCents); 
+
+// Stripe Checkout payload
 $payload = [
     'mode' => 'payment',
     'payment_method_types[0]' => 'card',
-    'success_url' => $successUrl,
-    'cancel_url' => $cancelUrl,
+    'success_url' => (!empty($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '/page/payment_success.php?session_id={CHECKOUT_SESSION_ID}',
+    'cancel_url' => (!empty($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '/page/cart_view.php?cancel=1',
     'customer_email' => $email,
+    'line_items[0][price_data][currency]' => 'myr',
+    'line_items[0][price_data][product_data][name]' => 'Total order price',
+    'line_items[0][price_data][unit_amount]' => $finalAmountCents,
+    'line_items[0][quantity]' => 1,
+   
+    'metadata[user_id]' => (string) $_SESSION['user_id'],
+    'metadata[discount_code]' => $discountCode ?? '',
+    'metadata[discount_amount]' => $discountAmount,
+    'metadata[items]' => json_encode($lineItemsForMetadata)
 ];
-
-foreach ($lineItems as $index => $item) {
-    $payload["line_items[$index][price_data][currency]"] = $item['price_data']['currency'];
-    $payload["line_items[$index][price_data][product_data][name]"] = $item['price_data']['product_data']['name'];
-    $payload["line_items[$index][price_data][unit_amount]"] = $item['price_data']['unit_amount'];
-    $payload["line_items[$index][quantity]"] = $item['quantity'];
-}
-
-// Optional metadata
-$payload['metadata[user_id]'] = (string) $_SESSION['user_id'];
 
 // Create Stripe Checkout Session via cURL
 $ch = curl_init('https://api.stripe.com/v1/checkout/sessions');
@@ -143,6 +129,9 @@ $_SESSION['pending_checkout'] = [
     'phone' => $phone,
     'address' => $address,
     'total_amount' => $totalAmount,
+    'discount_amount' => $discountAmount,
+    'final_amount' => $finalAmountCents / 100,
+    'discount_code' => $discountCode,
 ];
 
 echo json_encode(['sessionId' => $sessionData['id']]);
