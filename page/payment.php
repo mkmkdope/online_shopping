@@ -364,6 +364,14 @@ include '../sb_head.php';
                         </div>
                     </div>
 
+                     <h3>Promo Code</h3>
+    <div class="form-group" style="display: flex; gap: 0.5rem; align-items: center;">
+        <input type="text" id="discount_code" name="discount_code" placeholder="Enter Promo Code" style="flex:1;">
+        <button type="button" id="check_discount_btn">USE</button>
+    </div>
+    <div id="discount-message" style="color:green;"></div>
+</div>
+
                     <button type="submit" class="submit-btn">Complete Payment</button>
                     <div class="secure-note">🔒 Secure payment processing</div>
                 </form>
@@ -393,10 +401,15 @@ include '../sb_head.php';
                     <span>Shipping</span>
                     <span>RM0.00</span>
                 </div>
+
+                 <div class="summary-line">
+    <span>折扣</span>
+    <span id="discount-display">- RM0.00</span>
+</div>
                 <div class="summary-line total">
                     <span>Total</span>
-                    <span>RM<?= number_format($totalAmount, 2) ?></span>
-                </div>
+                    <span id="total-display">RM<?= number_format($totalAmount, 2) ?></span>
+</div>
             </div>
         </div>
     </div>
@@ -426,6 +439,76 @@ include '../sb_head.php';
                 alert(error.message);
             }
         });
+
+
+        
+const discountInput = document.getElementById('discount_code');
+const discountMsg   = document.getElementById('discount-message');
+const discountDisplay = document.getElementById('discount-display');
+const totalDisplay    = document.getElementById('total-display');
+
+
+let discountAmountField = document.createElement('input');
+discountAmountField.type = 'hidden';
+discountAmountField.name = 'discount_amount';
+discountAmountField.value = 0;
+form.appendChild(discountAmountField);
+
+let discountCodeUsedField = document.createElement('input');
+discountCodeUsedField.type = 'hidden';
+discountCodeUsedField.name = 'discount_code_used';
+discountCodeUsedField.value = '';
+form.appendChild(discountCodeUsedField);
+
+const originalTotal = parseFloat('<?= number_format($totalAmount, 2, '.', '') ?>');
+
+document.getElementById('check_discount_btn').addEventListener('click', function() {
+    const code = discountInput.value.trim();
+    if (!code) {
+        discountMsg.style.color = 'red';
+        discountMsg.textContent = 'Enter Promo Code';
+        return;
+    }
+
+    discountMsg.textContent = Verifying...';
+    discountMsg.style.color = 'black';
+
+    const formData = new FormData();
+    formData.append('code', code);
+    formData.append('selected_items', <?= json_encode($_POST['selected_items']) ?>);
+
+    fetch('discount_process.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            discountMsg.style.color = 'green';
+            discountMsg.textContent = '✅ Discount Sucess';
+
+            discountDisplay.textContent = '- RM' + data.discount_amount.toFixed(2);
+            totalDisplay.textContent = 'RM' + data.new_total.toFixed(2);
+
+            discountAmountField.value = data.discount_amount;
+            discountCodeUsedField.value = code;
+        } else {
+            discountMsg.style.color = 'red';
+            discountMsg.textContent = data.message;
+
+            discountDisplay.textContent = '- RM0.00';
+            totalDisplay.textContent = 'RM' + originalTotal.toFixed(2);
+
+            discountAmountField.value = 0;
+            discountCodeUsedField.value = '';
+        }
+    })
+    .catch(err => {
+        discountMsg.style.color = 'red';
+        discountMsg.textContent = 'Discount code verification failed, please try again.';
+        console.error(err);
+    });
+});
     </script>
 </body>
 
