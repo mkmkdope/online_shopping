@@ -170,6 +170,24 @@ CREATE TABLE `users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
+
+
+
+CREATE TABLE discount_codes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(50) NOT NULL UNIQUE,          -- Discount code
+    discount_type ENUM('percentage', 'fixed') NOT NULL,  -- Discount type: percentage or fixed amount
+    discount_value DECIMAL(10,2) NOT NULL,     -- Discount value
+    usage_limit INT DEFAULT 1,                 -- Usage limit
+    times_used INT DEFAULT 0,                  -- Number of times used
+    valid_from DATETIME,                       -- Valid start time
+    valid_until DATETIME,                      -- Valid end time
+    status ENUM('active','inactive') DEFAULT 'active', -- Status: active or inactive
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
 -- Indexes for dumped tables
 --
 
