@@ -113,6 +113,20 @@ include '../sb_head.php';
                 </div>
             </div>
         </section>
+
+          <!-- Location Section (Responsive Google Map) -->
+        <section style="margin: 3rem 0; text-align: center;">
+            <h2 style="margin-bottom: 2rem; color: #2c3e50;">Our Location</h2>
+            <div style="position: relative; width: 100%; max-width: 800px; padding-bottom: 56.25%; margin: 0 auto;">
+                <iframe
+  src="https://maps.google.com/maps?q=Kuala+Lumpur+City+Centre,+50450+Kuala+Lumpur&z=16&output=embed&markers=Kuala+Lumpur+City+Centre"
+  style="border:0; width:100%; height:100%; position:absolute; top:0; left:0;"
+  allowfullscreen
+  loading="lazy"
+  referrerpolicy="no-referrer-when-downgrade">
+</iframe>
+
+                
     </main>
 </body>
 </html>
