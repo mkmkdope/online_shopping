@@ -168,7 +168,7 @@ if (empty($sessionId) && !empty($paymentId) && !empty($referenceNo)) {
                 'reference_no' => $paymentIntentId,
                 'method' => 'Stripe Checkout',
                 'status' => 'SUCCESS',
-                'amount' => $totalAmount ?: $paymentAmount,
+               'amount' => $stripeResponse['amount_total'] / 100, 
                 'transaction_time' => date('Y-m-d H:i:s'),
             ];
         } catch (Exception $e) {
