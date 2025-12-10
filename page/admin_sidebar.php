@@ -65,6 +65,11 @@ if ($currentAdminId) {
                 <i class="fas fa-users"></i>
                 <span class="menu-text">Customers</span>
             </a>
+
+             <a href="discount_panel.php" class="menu-item">
+        <i class="fas fa-tags"></i>
+        <span class="menu-text">Discounts</span>
+    </a>
             <a href="#" class="menu-item">
                 <i class="fas fa-chart-bar"></i>
                 <span class="menu-text">Reports</span>
