@@ -362,15 +362,34 @@ include '../sb_head.php';
                             <label for="address">Address</label>
                             <input type="text" id="address" name="address" required>
                         </div>
+
+                        <div class="form-group">
+                            <label for="postcode">Postcode / ZIP Code</label>
+                            <input type="text" id="postcode" name="postcode" required>
+                        </div>
+
+                        <div class="form-group" style="margin-top:-0.5rem;">
+                            <button type="button" id="calculate_shipping_btn" style="
+                                padding: 0.6rem 1rem;
+                                background:#3498db;
+                                color:white;
+                                border:none;
+                                border-radius:4px;
+                                cursor:pointer;
+                            ">Calculate Shipping</button>
+                        </div>
+
+                        <div id="shipping-message" style="color:blue; font-size:0.9rem; margin-top:0.3rem;"></div>
                     </div>
 
-                     <h3>Promo Code</h3>
-    <div class="form-group" style="display: flex; gap: 0.5rem; align-items: center;">
-        <input type="text" id="discount_code" name="discount_code" placeholder="Enter Promo Code" style="flex:1;">
-        <button type="button" id="check_discount_btn">USE</button>
-    </div>
-    <div id="discount-message" style="color:green;"></div>
-</div>
+                    <div class="form-section">
+                        <h3>Discount Code</h3>
+                        <div class="form-group" style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="text" id="discount_code" name="discount_code" placeholder="Enter discount code" style="flex:1;">
+                            <button type="button" id="check_discount_btn">Check Availability</button>
+                        </div>
+                        <div id="discount-message" style="color:green;"></div>
+                    </div>
 
                     <button type="submit" class="submit-btn">Complete Payment</button>
                     <div class="secure-note">🔒 Secure payment processing</div>
@@ -398,18 +417,19 @@ include '../sb_head.php';
                     <span>RM<?= number_format($totalAmount, 2) ?></span>
                 </div>
                 <div class="summary-line">
-                    <span>Shipping</span>
-                    <span>RM0.00</span>
+                    <span>Discount</span>
+                    <span id="discount-display">- RM0.00</span>
                 </div>
 
-                 <div class="summary-line">
-    <span>折扣</span>
-    <span id="discount-display">- RM0.00</span>
-</div>
+                <div class="summary-line">
+                    <span>Shipping Fee</span>
+                    <span id="shipping-display">RM0.00</span>
+                </div>
+
                 <div class="summary-line total">
                     <span>Total</span>
                     <span id="total-display">RM<?= number_format($totalAmount, 2) ?></span>
-</div>
+                </div>
             </div>
         </div>
     </div>
@@ -440,75 +460,138 @@ include '../sb_head.php';
             }
         });
 
+        const discountInput = document.getElementById('discount_code');
+        const discountMsg   = document.getElementById('discount-message');
+        const discountDisplay = document.getElementById('discount-display');
+        const totalDisplay    = document.getElementById('total-display');
 
-        
-const discountInput = document.getElementById('discount_code');
-const discountMsg   = document.getElementById('discount-message');
-const discountDisplay = document.getElementById('discount-display');
-const totalDisplay    = document.getElementById('total-display');
+        let discountAmountField = document.createElement('input');
+        discountAmountField.type = 'hidden';
+        discountAmountField.name = 'discount_amount';
+        discountAmountField.value = 0;
+        form.appendChild(discountAmountField);
 
+        let discountCodeUsedField = document.createElement('input');
+        discountCodeUsedField.type = 'hidden';
+        discountCodeUsedField.name = 'discount_code_used';
+        discountCodeUsedField.value = '';
+        form.appendChild(discountCodeUsedField);
 
-let discountAmountField = document.createElement('input');
-discountAmountField.type = 'hidden';
-discountAmountField.name = 'discount_amount';
-discountAmountField.value = 0;
-form.appendChild(discountAmountField);
+        const originalTotal = parseFloat('<?= number_format($totalAmount, 2, '.', '') ?>');
 
-let discountCodeUsedField = document.createElement('input');
-discountCodeUsedField.type = 'hidden';
-discountCodeUsedField.name = 'discount_code_used';
-discountCodeUsedField.value = '';
-form.appendChild(discountCodeUsedField);
+        document.getElementById('check_discount_btn').addEventListener('click', function() {
+            const code = discountInput.value.trim();
+            if (!code) {
+                discountMsg.style.color = 'red';
+                discountMsg.textContent = 'Please enter a discount code';
+                return;
+            }
 
-const originalTotal = parseFloat('<?= number_format($totalAmount, 2, '.', '') ?>');
+            discountMsg.textContent = 'Validating...';
+            discountMsg.style.color = 'black';
 
-document.getElementById('check_discount_btn').addEventListener('click', function() {
-    const code = discountInput.value.trim();
-    if (!code) {
-        discountMsg.style.color = 'red';
-        discountMsg.textContent = 'Enter Promo Code';
-        return;
-    }
+            const formData = new FormData();
+            formData.append('code', code);
+            formData.append('selected_items', <?= json_encode($_POST['selected_items']) ?>);
 
-    discountMsg.textContent = Verifying...';
-    discountMsg.style.color = 'black';
+            fetch('discount_process.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    discountMsg.style.color = 'green';
+                    discountMsg.textContent = 'Discount Applied Successfully';
 
-    const formData = new FormData();
-    formData.append('code', code);
-    formData.append('selected_items', <?= json_encode($_POST['selected_items']) ?>);
+                    discountDisplay.textContent = '- RM' + data.discount_amount.toFixed(2);
+                    totalDisplay.textContent = 'RM' + data.new_total.toFixed(2);
 
-    fetch('discount_process.php', {
-        method: 'POST',
-        body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            discountMsg.style.color = 'green';
-            discountMsg.textContent = '✅ Discount Sucess';
+                    discountAmountField.value = data.discount_amount;
+                    discountCodeUsedField.value = code;
+                } else {
+                    discountMsg.style.color = 'red';
+                    discountMsg.textContent = data.message;
 
-            discountDisplay.textContent = '- RM' + data.discount_amount.toFixed(2);
-            totalDisplay.textContent = 'RM' + data.new_total.toFixed(2);
+                    discountDisplay.textContent = '- RM0.00';
+                    totalDisplay.textContent = 'RM' + originalTotal.toFixed(2);
 
-            discountAmountField.value = data.discount_amount;
-            discountCodeUsedField.value = code;
-        } else {
-            discountMsg.style.color = 'red';
-            discountMsg.textContent = data.message;
+                    discountAmountField.value = 0;
+                    discountCodeUsedField.value = '';
+                }
+            })
+            .catch(err => {
+                discountMsg.style.color = 'red';
+                discountMsg.textContent = 'Failed to validate discount code. Please try again';
+                console.error(err);
+            });
+        });
 
-            discountDisplay.textContent = '- RM0.00';
-            totalDisplay.textContent = 'RM' + originalTotal.toFixed(2);
+        const shippingFeeDisplay = document.createElement('div');
+        shippingFeeDisplay.style.marginTop = "0.5rem";
 
-            discountAmountField.value = 0;
-            discountCodeUsedField.value = '';
-        }
-    })
-    .catch(err => {
-        discountMsg.style.color = 'red';
-        discountMsg.textContent = 'Discount code verification failed, please try again.';
-        console.error(err);
-    });
-});
+        let shippingAmountField = document.createElement('input');
+        shippingAmountField.type = 'hidden';
+        shippingAmountField.name = 'shipping_fee';
+        shippingAmountField.value = 0;
+        form.appendChild(shippingAmountField);
+
+        const shippingMsg = document.getElementById('shipping-message');
+        const calculateShippingBtn = document.getElementById('calculate_shipping_btn');
+        const postcodeInput = document.getElementById('postcode');
+
+        let currentTotalAmount = parseFloat('<?= number_format($totalAmount, 2, ".", "") ?>');
+
+        calculateShippingBtn.addEventListener('click', () => {
+            const postcode = postcodeInput.value.trim();
+            if (!postcode) {
+                shippingMsg.style.color = "red";
+                shippingMsg.textContent = "⚠ Please enter a postcode";
+                return;
+            }
+
+            shippingMsg.style.color = "black";
+            shippingMsg.textContent = "Calculating shipping...";
+
+            const formData = new FormData();
+            formData.append('postcode', postcode);
+
+            fetch('shipping_fee.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    shippingMsg.style.color = "green";
+                    shippingMsg.textContent = "✔ Shipping fee calculated: RM" + data.shipping_fee.toFixed(2);
+
+                    shippingAmountField.value = data.shipping_fee;
+
+                    let discountValue = parseFloat(discountAmountField.value);
+                    const newTotal = currentTotalAmount - discountValue + data.shipping_fee;
+
+                    document.getElementById('shipping-display').textContent =
+                        "RM" + data.shipping_fee.toFixed(2);
+
+                    document.getElementById('total-display').textContent = "RM" + newTotal.toFixed(2);
+                } else {
+                    shippingMsg.style.color = "red";
+                    shippingMsg.textContent = data.message;
+                    shippingAmountField.value = 0;
+
+                    let discountValue = parseFloat(discountAmountField.value);
+                    document.getElementById('total-display').textContent =
+                        "RM" + (currentTotalAmount - discountValue).toFixed(2);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                shippingMsg.style.color = "red";
+                shippingMsg.textContent = "Unable to calculate shipping. Please try again later";
+            });
+        });
+
     </script>
 </body>
 
