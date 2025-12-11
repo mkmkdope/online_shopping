@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
     header('Location: /login/login.php?error=Please login to proceed');
     exit;
@@ -13,6 +14,7 @@ require_once __DIR__ . '/../sb_base.php';
 require_once __DIR__ . '/cart.php';
 require_once __DIR__ . '/product_functions.php';
 
+// Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: cart_view.php');
     exit;
@@ -26,7 +28,9 @@ $phone = $_POST['phone'] ?? '';
 $address = $_POST['address'] ?? '';
 
 $discountAmount = floatval($_POST['discount_amount'] ?? 0);
-$discountCode   = $_POST['discount_code_used'] ?? '';
+$discountCode = $_POST['discount_code_used'] ?? '';
+
+$shippingFee = floatval($_POST['shipping_fee'] ?? 0);   // ⭐ Added: Shipping fee
 
 if (empty($selectedProductIds) || !is_array($selectedProductIds)) {
     header('Content-Type: application/json');
@@ -34,11 +38,10 @@ if (empty($selectedProductIds) || !is_array($selectedProductIds)) {
     exit;
 }
 
-// Build line items from DB to avoid client tampering
+// Calculate total & generate metadata items
 $cartUserId = cart_user_id();
 $totalAmount = 0;
 $lineItemsForMetadata = [];
-
 
 foreach ($selectedProductIds as $productId) {
     $cartStmt = $pdo->prepare("SELECT * FROM cart_items WHERE user_id = ? AND product_id = ?");
@@ -52,6 +55,7 @@ foreach ($selectedProductIds as $productId) {
     $quantity = (int) $cartItem['quantity'];
     $unitPrice = (float) $product['price'];
     $lineTotal = $unitPrice * $quantity;
+
     $totalAmount += $lineTotal;
 
     $lineItemsForMetadata[] = [
@@ -68,9 +72,10 @@ if ($totalAmount <= 0) {
     exit;
 }
 
-
-$finalAmountCents = (int) round(($totalAmount - $discountAmount) * 100);
-$finalAmountCents = max(0, $finalAmountCents); 
+// ⭐ Final amount after discount + shipping fee
+$finalAmount = $totalAmount - $discountAmount + $shippingFee;
+$finalAmountCents = (int) round($finalAmount * 100);
+$finalAmountCents = max(0, $finalAmountCents); // Prevent negative
 
 // Stripe Checkout payload
 $payload = [
@@ -79,18 +84,22 @@ $payload = [
     'success_url' => (!empty($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '/page/payment_success.php?session_id={CHECKOUT_SESSION_ID}',
     'cancel_url' => (!empty($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '/page/cart_view.php?cancel=1',
     'customer_email' => $email,
+
+    // Stripe only needs 1 line item (total amount)
     'line_items[0][price_data][currency]' => 'myr',
-    'line_items[0][price_data][product_data][name]' => 'Total order price',
+    'line_items[0][price_data][product_data][name]' => 'Order Total',
     'line_items[0][price_data][unit_amount]' => $finalAmountCents,
     'line_items[0][quantity]' => 1,
-   
+
+    // metadata stores details, discount, shipping
     'metadata[user_id]' => (string) $_SESSION['user_id'],
-    'metadata[discount_code]' => $discountCode ?? '',
+    'metadata[discount_code]' => $discountCode,
     'metadata[discount_amount]' => $discountAmount,
-    'metadata[items]' => json_encode($lineItemsForMetadata)
+    'metadata[shipping_fee]' => $shippingFee,
+    'metadata[items]' => json_encode($lineItemsForMetadata),
 ];
 
-// Create Stripe Checkout Session via cURL
+// Create Stripe Session
 $ch = curl_init('https://api.stripe.com/v1/checkout/sessions');
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
@@ -120,7 +129,7 @@ if (empty($sessionData['id'])) {
     exit;
 }
 
-// Save checkout context for success page to finalize order
+// Save pending_checkout session data
 $_SESSION['pending_checkout'] = [
     'session_id' => $sessionData['id'],
     'selected_product_ids' => $selectedProductIds,
@@ -130,7 +139,8 @@ $_SESSION['pending_checkout'] = [
     'address' => $address,
     'total_amount' => $totalAmount,
     'discount_amount' => $discountAmount,
-    'final_amount' => $finalAmountCents / 100,
+    'shipping_fee' => $shippingFee,   // ⭐ Save shipping fee
+    'final_amount' => $finalAmount,
     'discount_code' => $discountCode,
 ];
 
