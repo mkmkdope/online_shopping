@@ -35,35 +35,54 @@ if (is_string($category_filter)) {
 $category_filter = array_map('intval', $category_filter);
 
 // Build SQL query with filters
-$sql = "SELECT p.*, c.name as category_name 
-        FROM products p 
-        LEFT JOIN categories c ON p.category_id = c.id 
-        WHERE 1=1";
+$base_sql = "FROM products p 
+             LEFT JOIN categories c ON p.category_id = c.id 
+             LEFT JOIN product_reviews r ON p.id = r.product_id
+             WHERE 1=1";
 
 $params = [];
 
 // Search filter
 if (!empty($search)) {
-    $sql .= " AND (p.title LIKE :search OR p.author LIKE :search OR p.description LIKE :search)";
+    $base_sql .= " AND (p.title LIKE :search OR p.author LIKE :search OR p.description LIKE :search)";
     $params[':search'] = "%$search%";
 }
 
 // Category filter
 if (!empty($category_filter)) {
     $placeholders = implode(',', array_fill(0, count($category_filter), '?'));
-    $sql .= " AND p.category_id IN ($placeholders)";
+    $base_sql .= " AND p.category_id IN ($placeholders)";
     $params = array_merge($params, $category_filter);
 }
 
-// Price filter
+// Price filters
 if (!empty($min_price)) {
-    $sql .= " AND p.price >= ?";
+    $base_sql .= " AND p.price >= ?";
     $params[] = $min_price;
 }
 if (!empty($max_price)) {
-    $sql .= " AND p.price <= ?";
+    $base_sql .= " AND p.price <= ?";
     $params[] = $max_price;
 }
+
+// -----------------------------------------
+// COUNT QUERY (NO ORDER BY ALLOWED)
+// -----------------------------------------
+$count_sql = "SELECT COUNT(DISTINCT p.id) " . $base_sql;
+$count_stmt = $pdo->prepare($count_sql);
+$count_stmt->execute($params);
+$total_products = $count_stmt->fetchColumn();
+
+// -----------------------------------------
+// MAIN QUERY WITH RATING + CATEGORY NAME
+// -----------------------------------------
+$sql = "SELECT 
+            p.*, 
+            c.name AS category_name,
+            COALESCE(AVG(r.rating), 0) AS avg_rating,
+            COUNT(r.id) AS review_count
+        $base_sql
+        GROUP BY p.id";
 
 // Sorting
 $sort_options = [
@@ -74,27 +93,22 @@ $sort_options = [
     'date_desc' => 'p.publication_date DESC',
     'date_asc' => 'p.publication_date ASC'
 ];
+
 $sql .= " ORDER BY " . ($sort_options[$sort] ?? 'p.title ASC');
 
 // Pagination
 $products_per_page = 6;
 $offset = ($page - 1) * $products_per_page;
-
-// Get total count for pagination
-$count_sql = "SELECT COUNT(*) FROM ($sql) as count_table";
-$count_stmt = $pdo->prepare($count_sql);
-$count_stmt->execute($params);
-$total_products = $count_stmt->fetchColumn();
-
-// Add pagination to main query
 $sql .= " LIMIT $products_per_page OFFSET $offset";
 
-// Execute main query
+// -----------------------------------------
+// EXECUTE MAIN QUERY
+// -----------------------------------------
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Calculate total pages
+// Total pages
 $total_pages = ceil($total_products / $products_per_page);
 
 ////////// testing paging with loop //////////
@@ -487,6 +501,17 @@ $total_pages = ceil($total_products / $products_per_page);
             flex-direction: column;
             gap: 15px;
         }
+
+              .product-rating .star {
+    color: #f5a623;
+    font-size: 16px; 
+}
+
+.product-rating .review-info {
+    font-size: 0.9em;
+    color: #666;
+    margin-left: 5px;
+}
     </style>
 </head>
 <body>
@@ -600,6 +625,20 @@ $total_pages = ceil($total_products / $products_per_page);
                                         <?php echo htmlspecialchars($product['category_name'] ?? 'Uncategorized'); ?>
                                     </div>
                                     <h3 class="product-title"><?php echo htmlspecialchars($product['title']); ?></h3>
+                                       <div class="product-rating">
+<?php 
+$avg_rating = $product['avg_rating'] ?? 0;
+$review_count = $product['review_count'] ?? 0;
+
+$avg = round($avg_rating);
+
+for ($i = 1; $i <= 5; $i++) {
+    echo $i <= $avg ? '<span class="star">★</span>' : '<span class="star">☆</span>';
+}
+?>
+<span class="review-info">(<?= number_format($avg_rating,2) ?> / 5, <?= $review_count ?> reviews)</span>
+</div>
+
                                     <div class="product-author">by <?php echo htmlspecialchars($product['author']); ?></div>
                                     <div class="product-price">$<?php echo number_format($product['price'], 2); ?></div>
                                     <span class="stock-status <?php echo $product['stock_status']; ?>">
