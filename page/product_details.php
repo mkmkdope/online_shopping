@@ -60,7 +60,6 @@ include '../sb_head.php';
 <title><?php echo $_title; ?> - Book Shop</title>
 <link rel="stylesheet" href="/css/product.css">
 <style>
-/* Star rating styles */
 #star-rating span {
     font-size: 1.4em;
     cursor: pointer;
@@ -181,7 +180,7 @@ include '../sb_head.php';
 
     <label for="review-text">Your Review:</label>
 
-    <!-- ⭐⭐⭐ Hidden input for editing review ⭐⭐⭐ -->
+   
     <input type="hidden" id="editing-review-id" name="review_id" value="">
 
     <textarea id="review-text" rows="4" placeholder="Write your review..."></textarea>
@@ -191,64 +190,64 @@ include '../sb_head.php';
 </div>
 <?php else: ?>
 <p><a href="/login/login.php">Login</a> to write a review.</p>
-<?php endif; ?>  
+<?php endif; ?>
 
 
-<!-- Ratings Summary -->
-<div class="rating-summary">
-    <h3>Ratings</h3>
-    <?php if ($ratingInfo['count'] > 0): ?>
-    <div class="rating-stars">
-        <?php
-        $avg = round($ratingInfo['avg']);
-        for ($i=1;$i<=5;$i++){
-            echo $i<=$avg?'★':'☆';
-        }
-        ?>
-        <span class="rating-text">(<?= $ratingInfo['avg'] ?> / 5, <?= $ratingInfo['count'] ?> reviews)</span>
-    </div>
-    <?php else: ?>
-    <p class="no-reviews">No ratings yet.</p>
-    <?php endif; ?>
-</div>
-
-
-<div class="review-list">
-<h3>User Reviews</h3>
-
-<?php if (empty($reviews)): ?>
-    <p class="no-reviews">No reviews yet.</p>
-<?php else: ?>
-    <?php foreach ($reviews as $r): ?>
-    <div class="review-item">
-        
-        <div class="review-header">
-            <strong><?= htmlspecialchars($r['username'] ?? 'User') ?></strong>
-
-            <?php if ($r['user_id'] == ($_SESSION['user_id'] ?? -1)): ?>
-            <span class="review-actions">
-                <button class="edit-review-btn"
-                    data-id="<?= $r['id'] ?>"
-                    data-text="<?= htmlspecialchars($r['review']) ?>"
-                    data-rating="<?= $r['rating'] ?>">Edit</button>
-
-                <button class="delete-review-btn"
-                    data-id="<?= $r['id'] ?>">Delete</button>
-            </span>
+           <!-- Ratings Summary -->
+        <div class="rating-summary">
+            <h3>Ratings</h3>
+            <?php if ($ratingInfo['count'] > 0): ?>
+            <div class="rating-stars">
+                <?php
+                $avg = round($ratingInfo['avg']);
+                for ($i=1;$i<=5;$i++){
+                    echo $i<=$avg?'★':'☆';
+                }
+                ?>
+                <span class="rating-text">(<?= $ratingInfo['avg'] ?> / 5, <?= $ratingInfo['count'] ?> reviews)</span>
+            </div>
+            <?php else: ?>
+            <p class="no-reviews">No ratings yet.</p>
             <?php endif; ?>
         </div>
 
-        <div class="review-stars">
-        <?php for ($i = 1; $i <= 5; $i++): ?>
-            <span class="<?= $i <= $r['rating'] ? 'filled' : 'empty' ?>">★</span>
-        <?php endfor; ?>
-        </div>
 
-        <p><?= nl2br(htmlspecialchars($r['review'])) ?></p>
-        <small class="review-date"><?= date('F j, Y', strtotime($r['created_at'])) ?></small>
-    </div>
-    <?php endforeach; ?>
-<?php endif; ?>
+       <div class="review-list">
+    <h3>User Reviews</h3>
+
+    <?php if (empty($reviews)): ?>
+        <p class="no-reviews">No reviews yet.</p>
+    <?php else: ?>
+        <?php foreach ($reviews as $r): ?>
+        <div class="review-item">
+            
+            <div class="review-header">
+                <strong><?= htmlspecialchars($r['username'] ?? 'User') ?></strong>
+
+                <?php if ($r['user_id'] == ($_SESSION['user_id'] ?? -1)): ?>
+                <span class="review-actions">
+                    <button class="edit-review-btn"
+                        data-id="<?= $r['id'] ?>"
+                        data-text="<?= htmlspecialchars($r['review']) ?>"
+                        data-rating="<?= $r['rating'] ?>">Edit</button>
+
+                    <button class="delete-review-btn"
+                        data-id="<?= $r['id'] ?>">Delete</button>
+                </span>
+                <?php endif; ?>
+            </div>
+
+            <div class="review-stars">
+            <?php for ($i = 1; $i <= 5; $i++): ?>
+                <span class="<?= $i <= $r['rating'] ? 'filled' : 'empty' ?>">★</span>
+            <?php endfor; ?>
+            </div>
+
+            <p><?= nl2br(htmlspecialchars($r['review'])) ?></p>
+            <small class="review-date"><?= date('F j, Y', strtotime($r['created_at'])) ?></small>
+        </div>
+        <?php endforeach; ?>
+    <?php endif; ?>
 </div>
 
 
@@ -281,7 +280,6 @@ function updateCartBadge(count){
     } else badge?.remove();
 }
 function addToCart(pid){fetch('cart_add.php',{method:'POST',headers:{"Content-Type":"application/x-www-form-urlencoded"},body:`product_id=${pid}&qty=1`}).then(r=>r.json()).then(d=>{if(d.ok){alert('Product added!');updateCartBadge(d.cartCount);}else alert(d.message||'Failed');}).catch(()=>alert('Failed'));}
-
 function buyNow(pid){fetch('cart_add.php',{method:'POST',headers:{"Content-Type":"application/x-www-form-urlencoded"},body:`product_id=${pid}&qty=1`}).then(r=>r.json()).then(d=>{if(d.ok){updateCartBadge(d.cartCount);window.location.href='cart_view.php';}else alert(d.message||'Failed');}).catch(()=>alert('Failed'));}
 
 // Keyboard arrow for gallery
@@ -302,6 +300,107 @@ stars.forEach(star=>{
     star.addEventListener('mouseout',()=>{stars.forEach(s=>s.classList.remove('hovered'));});
     star.addEventListener('click',()=>{selectedRating=star.dataset.value;stars.forEach(s=>s.classList.remove('selected'));for(let i=0;i<selectedRating;i++) stars[i].classList.add('selected');document.getElementById('selected-rating').textContent=selectedRating;});
 });
+// Submit review AJAX
+
+document.addEventListener('DOMContentLoaded', () => {
+   
+    const stars = document.querySelectorAll('#star-rating span[data-value]');
+    let selectedRating = 0;
+
+    stars.forEach(star => {
+        star.addEventListener('mouseover', () => {
+            stars.forEach(s => s.classList.remove('hovered'));
+            for (let i = 0; i < star.dataset.value; i++) stars[i].classList.add('hovered');
+        });
+        star.addEventListener('mouseout', () => stars.forEach(s => s.classList.remove('hovered')));
+        star.addEventListener('click', () => {
+            selectedRating = star.dataset.value;
+            stars.forEach(s => s.classList.remove('selected'));
+            for (let i = 0; i < selectedRating; i++) stars[i].classList.add('selected');
+            document.getElementById('selected-rating').textContent = selectedRating;
+        });
+    });
+
+  
+    document.getElementById('submit-review-btn')?.addEventListener('click', () => {
+        const reviewText = document.getElementById('review-text').value.trim();
+        const pid = <?= $productId ?>;
+        const msg = document.getElementById('review-msg');
+        const reviewId = document.getElementById('editing-review-id').value;
+
+        if (!reviewText && selectedRating === 0) {
+            msg.textContent = "Please enter a review or select a rating.";
+            msg.style.color = "red";
+            return;
+        }
+
+        const btn = document.getElementById('submit-review-btn');
+        btn.disabled = true;
+
+        const ratingToSend = selectedRating === 0 ? "" : selectedRating;
+        const formData = `product_id=${pid}&rating=${ratingToSend}&review=${encodeURIComponent(reviewText)}&review_id=${reviewId}`;
+
+        fetch('submit_review.php', {
+            method: 'POST',
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: formData
+        })
+        .then(r => r.json())
+        .then(res => {
+            msg.textContent = res.message;
+            msg.style.color = res.success ? "green" : "red";
+            if (res.success) {
+                document.getElementById('review-text').value = '';
+                stars.forEach(s => s.classList.remove('selected'));
+                document.getElementById('selected-rating').textContent = 0;
+                selectedRating = 0;
+                document.getElementById('editing-review-id').value = '';
+                setTimeout(() => location.reload(), 500);
+            }
+        })
+        .catch(() => {
+            msg.textContent = "Failed to submit review.";
+            msg.style.color = "red";
+        })
+        .finally(() => btn.disabled = false);
+    });
+
+    document.querySelector('.review-list')?.addEventListener('click', e => {
+        
+        const editBtn = e.target.closest('.edit-review-btn');
+        if (editBtn) {
+            const reviewId = editBtn.dataset.id;
+            const oldText = editBtn.dataset.text;
+            const oldRating = parseInt(editBtn.dataset.rating);
+
+            document.getElementById('review-text').value = oldText;
+            selectedRating = oldRating;
+            stars.forEach((s,i) => s.classList.toggle('selected', i < oldRating));
+            document.getElementById('selected-rating').textContent = oldRating;
+            document.getElementById('editing-review-id').value = reviewId;
+        }
+
+        
+        const delBtn = e.target.closest('.delete-review-btn');
+        if (delBtn) {
+            if (!confirm("Are you sure you want to delete this review?")) return;
+            const reviewId = delBtn.dataset.id;
+
+            fetch("review_delete.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: `id=${reviewId}`
+            })
+            .then(r => r.json())
+            .then(res => {
+                alert(res.message);
+                if (res.success) location.reload();
+            });
+        }
+    });
+});
+
+
 </script>
 
 </body>
