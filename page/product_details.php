@@ -1,3 +1,4 @@
+
 <?php
 session_start();
 
@@ -71,6 +72,170 @@ include '../sb_head.php';
 
 .review-stars span.filled { color: #FFD700; }
 .review-stars span.empty { color: #ccc; }
+
+
+.review-edit-form {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 15px;
+}
+
+.edit-rating {
+    margin-bottom: 15px;
+}
+
+.edit-rating label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #495057;
+}
+
+.edit-star-rating {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.edit-star-rating span {
+    font-size: 1.6em;
+    cursor: pointer;
+    color: #ccc;
+    transition: color 0.2s, transform 0.1s;
+}
+
+.edit-star-rating span.selected {
+    color: #FFD700;
+}
+
+.edit-star-rating span.hovered {
+    color: #ffeb3b;
+    transform: scale(1.1);
+}
+
+.edit-star-rating span:hover {
+    transform: scale(1.1);
+}
+
+.edit-text label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #495057;
+}
+
+.edit-text textarea {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 14px;
+    resize: vertical;
+    min-height: 120px;
+    transition: border-color 0.3s;
+}
+
+.edit-text textarea:focus {
+    outline: none;
+    border-color: #4dabf7;
+    box-shadow: 0 0 0 3px rgba(77, 171, 247, 0.2);
+}
+
+.edit-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.edit-buttons button {
+    padding: 10px 24px;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+}
+
+.save-edit-btn {
+    background-color: #28a745;
+    color: white;
+}
+
+.save-edit-btn:hover {
+    background-color: #218838;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.2);
+}
+
+.save-edit-btn:active {
+    transform: translateY(0);
+}
+
+.save-edit-btn:disabled {
+    background-color: #94d3a2;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.cancel-edit-btn {
+    background-color: #6c757d;
+    color: white;
+}
+
+.cancel-edit-btn:hover {
+    background-color: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(108, 117, 125, 0.2);
+}
+
+.cancel-edit-btn:active {
+    transform: translateY(0);
+}
+
+.edit-message {
+    margin-top: 12px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+
+.review-edit-form h4 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #343a40;
+    font-size: 18px;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 10px;
+}
+
+
+.edit-rating > div {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+
+@media (max-width: 768px) {
+    .edit-buttons {
+        flex-direction: column;
+    }
+    
+    .edit-buttons button {
+        width: 100%;
+    }
+    
+    .edit-star-rating {
+        flex-wrap: wrap;
+    }
+}
 </style>
 </head>
 <body>
@@ -162,12 +327,11 @@ include '../sb_head.php';
         </div>
         <?php endif; ?>
 
-        
-<!-- Reviews -->
+      <!-- Reviews -->
 <?php if (isset($_SESSION['user_id'])): ?>
 <div class="review-form">
     <h3>Write a Review</h3>
-
+    
     <label>Your Rating:</label>
     <div class="star-rating" id="star-rating">
         <span data-value="1">☆</span>
@@ -177,14 +341,10 @@ include '../sb_head.php';
         <span data-value="5">☆</span>
         <span id="selected-rating" style="margin-left: 10px; font-weight:bold;">0</span>/5
     </div>
-
+    
     <label for="review-text">Your Review:</label>
-
-   
-    <input type="hidden" id="editing-review-id" name="review_id" value="">
-
     <textarea id="review-text" rows="4" placeholder="Write your review..."></textarea>
-
+    
     <button id="submit-review-btn">Submit Review</button>
     <p id="review-msg"></p>
 </div>
@@ -192,64 +352,97 @@ include '../sb_head.php';
 <p><a href="/login/login.php">Login</a> to write a review.</p>
 <?php endif; ?>
 
+<!-- Ratings Summary -->
+<div class="rating-summary">
+    <h3>Ratings</h3>
+    <?php if ($ratingInfo['count'] > 0): ?>
+    <div class="rating-stars">
+        <?php
+        $avg = round($ratingInfo['avg']);
+        for ($i=1;$i<=5;$i++){
+            echo $i<=$avg?'★':'☆';
+        }
+        ?>
+        <span class="rating-text">(<?= $ratingInfo['avg'] ?> / 5, <?= $ratingInfo['count'] ?> reviews)</span>
+    </div>
+    <?php else: ?>
+    <p class="no-reviews">No ratings yet.</p>
+    <?php endif; ?>
+</div>
 
-           <!-- Ratings Summary -->
-        <div class="rating-summary">
-            <h3>Ratings</h3>
-            <?php if ($ratingInfo['count'] > 0): ?>
-            <div class="rating-stars">
-                <?php
-                $avg = round($ratingInfo['avg']);
-                for ($i=1;$i<=5;$i++){
-                    echo $i<=$avg?'★':'☆';
-                }
-                ?>
-                <span class="rating-text">(<?= $ratingInfo['avg'] ?> / 5, <?= $ratingInfo['count'] ?> reviews)</span>
-            </div>
-            <?php else: ?>
-            <p class="no-reviews">No ratings yet.</p>
-            <?php endif; ?>
-        </div>
-
-
-       <div class="review-list">
+<!-- User Reviews -->
+<div class="review-list">
     <h3>User Reviews</h3>
-
+    
     <?php if (empty($reviews)): ?>
         <p class="no-reviews">No reviews yet.</p>
     <?php else: ?>
         <?php foreach ($reviews as $r): ?>
-        <div class="review-item">
+        <div class="review-item" id="review-<?= $r['id'] ?>">
+          
+            <div class="review-display">
+                <div class="review-header">
+                    <strong><?= htmlspecialchars($r['username'] ?? 'User') ?></strong>
+                    
+                    <?php if ($r['user_id'] == ($_SESSION['user_id'] ?? -1)): ?>
+                    <span class="review-actions">
+                        <button class="edit-review-btn" onclick="startEditReview(<?= $r['id'] ?>)">Edit</button>
+                        <button class="delete-review-btn" onclick="deleteReview(<?= $r['id'] ?>)">Delete</button>
+                    </span>
+                    <?php endif; ?>
+                </div>
+                
+                <div class="review-stars">
+                    <?php for ($i = 1; $i <= 5; $i++): ?>
+                    <span class="<?= $i <= $r['rating'] ? 'filled' : 'empty' ?>">★</span>
+                    <?php endfor; ?>
+                </div>
+                
+                <p><?= nl2br(htmlspecialchars($r['review'])) ?></p>
+                <small class="review-date"><?= date('F j, Y', strtotime($r['created_at'])) ?></small>
+            </div>
             
-            <div class="review-header">
-                <strong><?= htmlspecialchars($r['username'] ?? 'User') ?></strong>
-
-                <?php if ($r['user_id'] == ($_SESSION['user_id'] ?? -1)): ?>
-                <span class="review-actions">
-                    <button class="edit-review-btn"
-                        data-id="<?= $r['id'] ?>"
-                        data-text="<?= htmlspecialchars($r['review']) ?>"
-                        data-rating="<?= $r['rating'] ?>">Edit</button>
-
-                    <button class="delete-review-btn"
-                        data-id="<?= $r['id'] ?>">Delete</button>
-                </span>
-                <?php endif; ?>
+     
+<div class="review-edit-form" id="edit-form-<?= $r['id'] ?>" style="display: none;">
+    <h4>Edit Your Review</h4>
+    
+    <div class="edit-rating">
+        <label>Rating:</label>
+        <div class="rating-input">
+            <div class="star-rating edit-star-rating" id="edit-rating-<?= $r['id'] ?>">
+                <?php for ($i=1; $i<=5; $i++): ?>
+                <span data-value="<?= $i ?>" class="<?= $i <= $r['rating'] ? 'selected' : '' ?>">☆</span>
+                <?php endfor; ?>
+                <div class="rating-display">
+                    <span id="edit-selected-rating-<?= $r['id'] ?>" class="rating-value"><?= $r['rating'] ?></span>
+                    <span class="rating-max">/5</span>
+                </div>
             </div>
-
-            <div class="review-stars">
-            <?php for ($i = 1; $i <= 5; $i++): ?>
-                <span class="<?= $i <= $r['rating'] ? 'filled' : 'empty' ?>">★</span>
-            <?php endfor; ?>
-            </div>
-
-            <p><?= nl2br(htmlspecialchars($r['review'])) ?></p>
-            <small class="review-date"><?= date('F j, Y', strtotime($r['created_at'])) ?></small>
+        </div>
+    </div>
+    
+    <div class="edit-text">
+        <label for="edit-textarea-<?= $r['id'] ?>">Review:</label>
+        <textarea 
+            id="edit-textarea-<?= $r['id'] ?>" 
+            rows="4"
+            placeholder="Share your updated thoughts on this product..."
+        ><?= htmlspecialchars($r['review']) ?></textarea>
+    </div>
+    
+    <div class="edit-buttons">
+        <button class="save-edit-btn" onclick="saveEditedReview(<?= $r['id'] ?>)">
+            <span class="btn-text">Save Changes</span>
+            <span class="btn-spinner" style="display:none;">Saving...</span>
+        </button>
+        <button class="cancel-edit-btn" onclick="cancelEditReview(<?= $r['id'] ?>)">Cancel</button>
+    </div>
+    <p class="edit-message" id="edit-msg-<?= $r['id'] ?>"></p>
+</div>
         </div>
         <?php endforeach; ?>
     <?php endif; ?>
 </div>
-
 
     </div>
 </div>
@@ -279,8 +472,41 @@ function updateCartBadge(count){
         }
     } else badge?.remove();
 }
-function addToCart(pid){fetch('cart_add.php',{method:'POST',headers:{"Content-Type":"application/x-www-form-urlencoded"},body:`product_id=${pid}&qty=1`}).then(r=>r.json()).then(d=>{if(d.ok){alert('Product added!');updateCartBadge(d.cartCount);}else alert(d.message||'Failed');}).catch(()=>alert('Failed'));}
-function buyNow(pid){fetch('cart_add.php',{method:'POST',headers:{"Content-Type":"application/x-www-form-urlencoded"},body:`product_id=${pid}&qty=1`}).then(r=>r.json()).then(d=>{if(d.ok){updateCartBadge(d.cartCount);window.location.href='cart_view.php';}else alert(d.message||'Failed');}).catch(()=>alert('Failed'));}
+function addToCart(pid){
+    fetch('cart_add.php',{
+        method:'POST',
+        headers:{"Content-Type":"application/x-www-form-urlencoded"},
+        body:`product_id=${pid}&qty=1`
+    })
+    .then(r=>r.json())
+    .then(d=>{
+        if(d.ok){
+            alert('Product added!');
+            updateCartBadge(d.cartCount);
+        } else {
+            alert(d.message||'Failed');
+        }
+    })
+    .catch(()=>alert('Failed'));
+}
+
+function buyNow(pid){
+    fetch('cart_add.php',{
+        method:'POST',
+        headers:{"Content-Type":"application/x-www-form-urlencoded"},
+        body:`product_id=${pid}&qty=1`
+    })
+    .then(r=>r.json())
+    .then(d=>{
+        if(d.ok){
+            updateCartBadge(d.cartCount);
+            window.location.href='cart_view.php';
+        } else {
+            alert(d.message||'Failed');
+        }
+    })
+    .catch(()=>alert('Failed'));
+}
 
 // Keyboard arrow for gallery
 document.addEventListener('keydown',e=>{
@@ -288,58 +514,63 @@ document.addEventListener('keydown',e=>{
     if(thumbs.length<=1) return;
     const active=document.querySelector('.gallery-thumb.active');
     let idx=Array.from(thumbs).indexOf(active);
-    if(e.key==='ArrowRight'){e.preventDefault(); idx=(idx+1)%thumbs.length; thumbs[idx].click();}
-    if(e.key==='ArrowLeft'){e.preventDefault(); idx=(idx-1+thumbs.length)%thumbs.length; thumbs[idx].click();}
+    if(e.key==='ArrowRight'){
+        e.preventDefault(); 
+        idx=(idx+1)%thumbs.length; 
+        thumbs[idx].click();
+    }
+    if(e.key==='ArrowLeft'){
+        e.preventDefault(); 
+        idx=(idx-1+thumbs.length)%thumbs.length; 
+        thumbs[idx].click();
+    }
 });
 
-// Review star selection
-const stars=document.querySelectorAll('#star-rating span[data-value]');
-let selectedRating=0;
-stars.forEach(star=>{
-    star.addEventListener('mouseover',()=>{stars.forEach(s=>s.classList.remove('hovered'));for(let i=0;i<star.dataset.value;i++) stars[i].classList.add('hovered');});
-    star.addEventListener('mouseout',()=>{stars.forEach(s=>s.classList.remove('hovered'));});
-    star.addEventListener('click',()=>{selectedRating=star.dataset.value;stars.forEach(s=>s.classList.remove('selected'));for(let i=0;i<selectedRating;i++) stars[i].classList.add('selected');document.getElementById('selected-rating').textContent=selectedRating;});
-});
-// Submit review AJAX
 
-document.addEventListener('DOMContentLoaded', () => {
-   
-    const stars = document.querySelectorAll('#star-rating span[data-value]');
-    let selectedRating = 0;
+const stars = document.querySelectorAll('#star-rating span[data-value]');
+let selectedRating = 0;
 
+if (stars.length > 0) {
     stars.forEach(star => {
         star.addEventListener('mouseover', () => {
             stars.forEach(s => s.classList.remove('hovered'));
-            for (let i = 0; i < star.dataset.value; i++) stars[i].classList.add('hovered');
+            for (let i = 0; i < star.dataset.value; i++) {
+                stars[i].classList.add('hovered');
+            }
         });
-        star.addEventListener('mouseout', () => stars.forEach(s => s.classList.remove('hovered')));
+        star.addEventListener('mouseout', () => {
+            stars.forEach(s => s.classList.remove('hovered'));
+        });
         star.addEventListener('click', () => {
-            selectedRating = star.dataset.value;
+            selectedRating = parseInt(star.dataset.value);
             stars.forEach(s => s.classList.remove('selected'));
-            for (let i = 0; i < selectedRating; i++) stars[i].classList.add('selected');
+            for (let i = 0; i < selectedRating; i++) {
+                stars[i].classList.add('selected');
+            }
             document.getElementById('selected-rating').textContent = selectedRating;
         });
     });
+}
 
-  
+document.addEventListener('DOMContentLoaded', () => {
+    
     document.getElementById('submit-review-btn')?.addEventListener('click', () => {
         const reviewText = document.getElementById('review-text').value.trim();
         const pid = <?= $productId ?>;
         const msg = document.getElementById('review-msg');
-        const reviewId = document.getElementById('editing-review-id').value;
-
+        
         if (!reviewText && selectedRating === 0) {
             msg.textContent = "Please enter a review or select a rating.";
             msg.style.color = "red";
             return;
         }
-
+        
         const btn = document.getElementById('submit-review-btn');
         btn.disabled = true;
-
+        
         const ratingToSend = selectedRating === 0 ? "" : selectedRating;
-        const formData = `product_id=${pid}&rating=${ratingToSend}&review=${encodeURIComponent(reviewText)}&review_id=${reviewId}`;
-
+        const formData = `product_id=${pid}&rating=${ratingToSend}&review=${encodeURIComponent(reviewText)}`;
+        
         fetch('submit_review.php', {
             method: 'POST',
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -354,8 +585,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 stars.forEach(s => s.classList.remove('selected'));
                 document.getElementById('selected-rating').textContent = 0;
                 selectedRating = 0;
-                document.getElementById('editing-review-id').value = '';
-                setTimeout(() => location.reload(), 500);
+                setTimeout(() => location.reload(), 1000);
             }
         })
         .catch(() => {
@@ -364,45 +594,184 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .finally(() => btn.disabled = false);
     });
-
-    document.querySelector('.review-list')?.addEventListener('click', e => {
-        
-        const editBtn = e.target.closest('.edit-review-btn');
-        if (editBtn) {
-            const reviewId = editBtn.dataset.id;
-            const oldText = editBtn.dataset.text;
-            const oldRating = parseInt(editBtn.dataset.rating);
-
-            document.getElementById('review-text').value = oldText;
-            selectedRating = oldRating;
-            stars.forEach((s,i) => s.classList.toggle('selected', i < oldRating));
-            document.getElementById('selected-rating').textContent = oldRating;
-            document.getElementById('editing-review-id').value = reviewId;
-        }
-
-        
-        const delBtn = e.target.closest('.delete-review-btn');
-        if (delBtn) {
-            if (!confirm("Are you sure you want to delete this review?")) return;
-            const reviewId = delBtn.dataset.id;
-
-            fetch("review_delete.php", {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: `id=${reviewId}`
-            })
-            .then(r => r.json())
-            .then(res => {
-                alert(res.message);
-                if (res.success) location.reload();
-            });
-        }
-    });
 });
 
 
+function startEditReview(reviewId) {
+   
+    document.querySelector(`#review-${reviewId} .review-display`).style.display = 'none';
+
+    document.querySelector(`#edit-form-${reviewId}`).style.display = 'block';
+    
+
+    initEditRating(reviewId);
+}
+
+function initEditRating(reviewId) {
+    const stars = document.querySelectorAll(`#edit-rating-${reviewId} span[data-value]`);
+    let selectedRating = parseInt(document.querySelector(`#edit-selected-rating-${reviewId}`).textContent) || 0;
+    
+    
+    stars.forEach(star => {
+        star.replaceWith(star.cloneNode(true));
+    });
+    
+    
+    const newStars = document.querySelectorAll(`#edit-rating-${reviewId} span[data-value]`);
+    
+    
+    newStars.forEach(star => {
+        if (parseInt(star.dataset.value) <= selectedRating) {
+            star.classList.add('selected');
+        } else {
+            star.classList.remove('selected');
+        }
+    });
+    
+    
+    newStars.forEach(star => {
+        star.addEventListener('mouseover', () => {
+            const hoverRating = parseInt(star.dataset.value);
+            newStars.forEach((s, index) => {
+                if (index < hoverRating) {
+                    s.classList.add('hovered');
+                } else {
+                    s.classList.remove('hovered');
+                }
+            });
+        });
+        
+        star.addEventListener('mouseout', () => {
+            newStars.forEach(s => s.classList.remove('hovered'));
+        });
+        
+        star.addEventListener('click', () => {
+            selectedRating = parseInt(star.dataset.value);
+            document.querySelector(`#edit-selected-rating-${reviewId}`).textContent = selectedRating;
+            
+            
+            newStars.forEach((s, index) => {
+                if (index < selectedRating) {
+                    s.classList.add('selected');
+                } else {
+                    s.classList.remove('selected');
+                }
+            });
+        });
+    });
+}
+function saveEditedReview(reviewId) {
+    const newRating = parseInt(document.querySelector(`#edit-selected-rating-${reviewId}`).textContent) || 0;
+    const newText = document.querySelector(`#edit-textarea-${reviewId}`).value.trim();
+    const msgElement = document.querySelector(`#edit-msg-${reviewId}`);
+    const saveBtn = document.querySelector(`#edit-form-${reviewId} .save-edit-btn`);
+    const btnText = saveBtn.querySelector('.btn-text');
+    const btnSpinner = saveBtn.querySelector('.btn-spinner');
+   
+    if (newRating === 0 && !newText) {
+        msgElement.textContent = "Please provide at least a rating or review content.";
+        msgElement.style.color = "#dc3545";
+        msgElement.style.backgroundColor = "#f8d7da";
+        msgElement.style.border = "1px solid #f5c6cb";
+        msgElement.style.padding = "8px 12px";
+        msgElement.style.borderRadius = "4px";
+        return;
+    }
+    
+    saveBtn.disabled = true;
+    if (btnText && btnSpinner) {
+        btnText.style.display = 'none';
+        btnSpinner.style.display = 'inline';
+    }
+    msgElement.textContent = "Saving your review...";
+    msgElement.style.color = "#0066cc";
+    msgElement.style.backgroundColor = "#e7f1ff";
+    msgElement.style.border = "1px solid #b3d7ff";
+    msgElement.style.padding = "8px 12px";
+    msgElement.style.borderRadius = "4px";
+    
+    fetch('submit_review.php', {
+        method: 'POST',
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `review_id=${reviewId}&rating=${newRating}&review=${encodeURIComponent(newText)}`
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            msgElement.textContent = res.message + " Refreshing...";
+            msgElement.style.color = "#155724";
+            msgElement.style.backgroundColor = "#d4edda";
+            msgElement.style.border = "1px solid #c3e6cb";
+            
+         
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            msgElement.textContent = res.message;
+            msgElement.style.color = "#721c24";
+            msgElement.style.backgroundColor = "#f8d7da";
+            msgElement.style.border = "1px solid #f5c6cb";
+            
+            if (btnText && btnSpinner) {
+                btnText.style.display = 'inline';
+                btnSpinner.style.display = 'none';
+            }
+            saveBtn.disabled = false;
+        }
+    })
+    .catch(() => {
+        msgElement.textContent = "Failed to update review. Please try again.";
+        msgElement.style.color = "#721c24";
+        msgElement.style.backgroundColor = "#f8d7da";
+        msgElement.style.border = "1px solid #f5c6cb";
+        
+        if (btnText && btnSpinner) {
+            btnText.style.display = 'inline';
+            btnSpinner.style.display = 'none';
+        }
+        saveBtn.disabled = false;
+    });
+}
+
+function cancelEditReview(reviewId) {
+    
+    document.querySelector(`#review-${reviewId} .review-display`).style.display = 'block';
+    
+    document.querySelector(`#edit-form-${reviewId}`).style.display = 'none';
+}
+
+function deleteReview(reviewId) {
+    if (!confirm("Are you sure you want to delete this review?")) return;
+    
+    fetch("review_delete.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `review_id=${reviewId}`
+    })
+    .then(r => r.json())
+    .then(res => {
+        alert(res.message);
+        if (res.success) {
+            
+            const reviewElement = document.querySelector(`#review-${reviewId}`);
+            if (reviewElement) {
+                reviewElement.remove();
+            }
+            
+           
+            setTimeout(() => {
+                location.reload();
+            }, 500);
+        }
+    })
+    .catch(() => {
+        alert("Failed to delete review.");
+    });
+}
 </script>
 
 </body>
 </html>
 <?php include '../sb_foot.php'; ?>
+
