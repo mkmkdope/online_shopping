@@ -4,7 +4,6 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
     header('Location: /login/login.php?error=Please login to proceed');
     exit;
@@ -14,7 +13,6 @@ require_once __DIR__ . '/../sb_base.php';
 require_once __DIR__ . '/cart.php';
 require_once __DIR__ . '/product_functions.php';
 
-// Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: cart_view.php');
     exit;
@@ -29,8 +27,7 @@ $address = $_POST['address'] ?? '';
 
 $discountAmount = floatval($_POST['discount_amount'] ?? 0);
 $discountCode = $_POST['discount_code_used'] ?? '';
-
-$shippingFee = floatval($_POST['shipping_fee'] ?? 0);   // ⭐ Added: Shipping fee
+$shippingFee = floatval($_POST['shipping_fee'] ?? 0);
 
 if (empty($selectedProductIds) || !is_array($selectedProductIds)) {
     header('Content-Type: application/json');
@@ -38,7 +35,7 @@ if (empty($selectedProductIds) || !is_array($selectedProductIds)) {
     exit;
 }
 
-// Calculate total & generate metadata items
+
 $cartUserId = cart_user_id();
 $totalAmount = 0;
 $lineItemsForMetadata = [];
@@ -62,7 +59,8 @@ foreach ($selectedProductIds as $productId) {
         'id' => $productId,
         'title' => $product['title'],
         'quantity' => $quantity,
-        'unit_price' => $unitPrice
+        'unit_price' => $unitPrice,
+        'product_title' => $product['title']  
     ];
 }
 
@@ -77,6 +75,8 @@ $finalAmount = $totalAmount - $discountAmount + $shippingFee;
 $finalAmountCents = (int) round($finalAmount * 100);
 $finalAmountCents = max(0, $finalAmountCents); // Prevent negative
 
+$orderNumber = 'ORD' . date('YmdHis') . rand(1000, 9999);
+
 // Stripe Checkout payload
 $payload = [
     'mode' => 'payment',
@@ -85,21 +85,22 @@ $payload = [
     'cancel_url' => (!empty($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '/page/cart_view.php?cancel=1',
     'customer_email' => $email,
 
-    // Stripe only needs 1 line item (total amount)
     'line_items[0][price_data][currency]' => 'myr',
-    'line_items[0][price_data][product_data][name]' => 'Order Total',
+    'line_items[0][price_data][product_data][name]' => 'Order #' . $orderNumber,
     'line_items[0][price_data][unit_amount]' => $finalAmountCents,
     'line_items[0][quantity]' => 1,
 
-    // metadata stores details, discount, shipping
     'metadata[user_id]' => (string) $_SESSION['user_id'],
+    'metadata[order_number]' => $orderNumber,
     'metadata[discount_code]' => $discountCode,
     'metadata[discount_amount]' => $discountAmount,
     'metadata[shipping_fee]' => $shippingFee,
+    'metadata[total_amount]' => $totalAmount,    
+    'metadata[final_amount]' => $finalAmount,     
     'metadata[items]' => json_encode($lineItemsForMetadata),
 ];
 
-// Create Stripe Session
+
 $ch = curl_init('https://api.stripe.com/v1/checkout/sessions');
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
@@ -129,19 +130,20 @@ if (empty($sessionData['id'])) {
     exit;
 }
 
-// Save pending_checkout session data
 $_SESSION['pending_checkout'] = [
     'session_id' => $sessionData['id'],
     'selected_product_ids' => $selectedProductIds,
-    'full_name' => $fullName,
-    'email' => $email,
-    'phone' => $phone,
-    'address' => $address,
+    'order_number' => $orderNumber,           
+    'shipping_name' => $fullName,            
+    'shipping_email' => $email,               
+    'shipping_phone' => $phone,               
+    'shipping_address' => $address,          
     'total_amount' => $totalAmount,
     'discount_amount' => $discountAmount,
-    'shipping_fee' => $shippingFee,   // ⭐ Save shipping fee
+    'shipping_fee' => $shippingFee,
     'final_amount' => $finalAmount,
     'discount_code' => $discountCode,
+    'line_items' => $lineItemsForMetadata,    
 ];
 
 echo json_encode(['sessionId' => $sessionData['id']]);
