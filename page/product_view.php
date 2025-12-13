@@ -1,3 +1,4 @@
+
 <?php
 $_title = 'Product Catalog - BookShop';
 include '../sb_head.php';
