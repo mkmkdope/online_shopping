@@ -1,5 +1,5 @@
 <?php
-// Handle Stripe success redirect: confirm payment, create order, and show receipt.
+// Handle Stripe success redirect: confirm payment, create order, show receipt, and award points.
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -13,6 +13,103 @@ require_once __DIR__ . '/../sb_base.php';
 require_once __DIR__ . '/cart.php';
 require_once __DIR__ . '/product_functions.php';
 
+function calculatePointsForPurchase($userId, $purchaseAmount, $orderId, $isFirstPurchase = false) {
+    global $pdo;
+    
+    try {
+        $stmt = $pdo->prepare("SELECT id, user_role FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch();
+        
+        if (!$user) {
+            throw new Exception("User not found");
+        }
+        
+        $userRole = $user['user_role'];
+        
+        $stmt = $pdo->prepare("
+            SELECT * FROM reward_rules 
+            WHERE is_active = 1 
+            AND (
+                JSON_CONTAINS(user_roles, ?, '$') OR 
+                JSON_CONTAINS(user_roles, '\"all\"', '$')
+            )
+            ORDER BY priority ASC, created_at DESC
+        ");
+        $stmt->execute([json_encode($userRole)]);
+        $applicableRules = $stmt->fetchAll();
+        
+        if (empty($applicableRules)) {
+            return ['success' => true, 'points_awarded' => 0, 'rule_used' => 'No applicable rules'];
+        }
+        
+        $points = 0;
+        $appliedRule = null;
+        
+        foreach ($applicableRules as $rule) {
+            if ($purchaseAmount >= $rule['min_spend']) {
+                if ($rule['rule_name'] === 'First Purchase Bonus' && !$isFirstPurchase) {
+                    continue; 
+                }
+                
+                $rulePoints = round($purchaseAmount * $rule['points_per_amount']);
+                
+                if ($rule['max_points_per_order'] > 0 && $rulePoints > $rule['max_points_per_order']) {
+                    $rulePoints = $rule['max_points_per_order'];
+                }
+                
+                $points = $rulePoints;
+                $appliedRule = $rule;
+                break; 
+            }
+        }
+        
+        if ($points > 0) {
+            $stmt = $pdo->prepare("SELECT total_points FROM reward_points WHERE user_id = ?");
+            $stmt->execute([$userId]);
+            $currentPoints = $stmt->fetch();
+            
+            if ($currentPoints) {
+                $newTotal = $currentPoints['total_points'] + $points;
+                $stmt = $pdo->prepare("UPDATE reward_points SET total_points = ?, updated_at = NOW() WHERE user_id = ?");
+                $stmt->execute([$newTotal, $userId]);
+            } else {
+                $newTotal = $points;
+                $stmt = $pdo->prepare("INSERT INTO reward_points (user_id, total_points) VALUES (?, ?)");
+                $stmt->execute([$userId, $points]);
+            }
+            
+           
+            $stmt = $pdo->prepare("INSERT INTO reward_point_transactions 
+                                   (user_id, points, transaction_type, description) 
+                                   VALUES (?, ?, 'earn', ?)");
+            $description = "Order #" . $orderId . " - RM" . number_format($purchaseAmount, 2) . " - " . $appliedRule['rule_name'];
+            $stmt->execute([$userId, $points, $description]);
+            
+            return [
+                'success' => true,
+                'points_awarded' => $points,
+                'new_balance' => $newTotal,
+                'rule_used' => $appliedRule['rule_name'],
+                'rule_id' => $appliedRule['id']
+            ];
+        }
+        
+        return ['success' => true, 'points_awarded' => 0, 'rule_used' => 'No rules applied'];
+        
+    } catch (Exception $e) {
+        return ['success' => false, 'error' => $e->getMessage()];
+    }
+}
+
+function isFirstPurchase($userId) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT COUNT(*) as order_count FROM orders WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    $result = $stmt->fetch();
+    return $result['order_count'] == 0;
+}
+
 $sessionId = $_GET['session_id'] ?? '';
 
 // Fallback for old flow
@@ -24,6 +121,10 @@ if (empty($sessionId) && (empty($referenceNo) || empty($paymentId))) {
     header('Location: /index.php');
     exit;
 }
+
+$pointsEarned = 0;
+$newPointsBalance = 0;
+$pointsMessage = '';
 
 // Legacy display (if already paid by old flow)
 if (empty($sessionId) && !empty($paymentId) && !empty($referenceNo)) {
@@ -72,6 +173,9 @@ if (empty($sessionId) && !empty($paymentId) && !empty($referenceNo)) {
     $paymentIntentId = $stripeResponse['payment_intent']['id'] ?? ($stripeResponse['payment_intent'] ?? $sessionId);
     $paymentAmount = isset($stripeResponse['amount_total']) ? ($stripeResponse['amount_total'] / 100) : ($pending['total_amount'] ?? 0);
 
+    $totalAmount = $stripeResponse['metadata']['total_amount'] ?? $pending['total_amount'];
+    $discountAmount = $stripeResponse['metadata']['discount_amount'] ?? $pending['discount_amount'] ?? 0;
+
     // Avoid double-processing if payment already stored
     $existingPaymentStmt = $pdo->prepare("SELECT * FROM payment WHERE reference_no = ? LIMIT 1");
     $existingPaymentStmt->execute([$paymentIntentId]);
@@ -82,8 +186,11 @@ if (empty($sessionId) && !empty($paymentId) && !empty($referenceNo)) {
             $pdo->beginTransaction();
 
             $userId = $_SESSION['user_id'];
-            $orderNumber = 'ORD-' . date('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
+            
+           
+            $orderNumber = $pending['order_number'] ?? ('ORD-' . date('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8)));
 
+          
             $orderSql = "INSERT INTO orders (user_id, order_number, total_amount, status, payment_status, 
                          shipping_name, shipping_email, shipping_phone, shipping_address, created_at) 
                          VALUES (?, ?, ?, 'processing', 'paid', ?, ?, ?, ?, NOW())";
@@ -93,17 +200,17 @@ if (empty($sessionId) && !empty($paymentId) && !empty($referenceNo)) {
                 $userId,
                 $orderNumber,
                 $paymentAmount,
-                $pending['full_name'] ?? '',
-                $pending['email'] ?? '',
-                $pending['phone'] ?? '',
-                $pending['address'] ?? '',
+                $pending['shipping_name'] ?? '',
+                $pending['shipping_email'] ?? '',
+                $pending['shipping_phone'] ?? '',
+                $pending['shipping_address'] ?? '',
             ]);
 
             $orderId = $pdo->lastInsertId();
 
             $selectedProductIds = $pending['selected_product_ids'] ?? [];
             $cartUserId = cart_user_id();
-            $totalAmount = 0;
+            $orderTotal = 0;
 
             foreach ($selectedProductIds as $productId) {
                 $cartSql = "SELECT * FROM cart_items WHERE user_id = ? AND product_id = ?";
@@ -120,7 +227,7 @@ if (empty($sessionId) && !empty($paymentId) && !empty($referenceNo)) {
                 }
 
                 $subtotal = $product['price'] * $cartItem['quantity'];
-                $totalAmount += $subtotal;
+                $orderTotal += $subtotal;
 
                 $itemSql = "INSERT INTO order_items (order_id, product_id, product_title, product_price, quantity, subtotal, created_at) 
                             VALUES (?, ?, ?, ?, ?, ?, NOW())";
@@ -148,7 +255,7 @@ if (empty($sessionId) && !empty($paymentId) && !empty($referenceNo)) {
             $paymentStmt = $pdo->prepare($paymentSql);
             $paymentStmt->execute([
                 $orderId,
-                $totalAmount ?: $paymentAmount,
+                $orderTotal ?: $paymentAmount,
                 'Stripe Checkout',
                 $paymentIntentId
             ]);
@@ -162,15 +269,35 @@ if (empty($sessionId) && !empty($paymentId) && !empty($referenceNo)) {
 
             $pdo->commit();
 
+            
+            $purchaseAmountForPoints = $totalAmount - $discountAmount;
+            if ($purchaseAmountForPoints < 0) {
+                $purchaseAmountForPoints = 0;
+            }
+            
+    
+            $firstPurchase = isFirstPurchase($userId);
+            
+            $pointsResult = calculatePointsForPurchase($userId, $purchaseAmountForPoints, $orderId, $firstPurchase);
+            
+            if ($pointsResult['success'] && $pointsResult['points_awarded'] > 0) {
+                $pointsEarned = $pointsResult['points_awarded'];
+                $newPointsBalance = $pointsResult['new_balance'];
+                $pointsMessage = "You earned " . $pointsEarned . " points! New balance: " . $newPointsBalance . " points.";
+            }
+
             // Build payment record for display
             $payment = [
                 'payment_id' => $paymentId,
                 'reference_no' => $paymentIntentId,
                 'method' => 'Stripe Checkout',
                 'status' => 'SUCCESS',
-               'amount' => $stripeResponse['amount_total'] / 100, 
+                'amount' => $stripeResponse['amount_total'] / 100, 
                 'transaction_time' => date('Y-m-d H:i:s'),
+                'order_id' => $orderId,
+                'order_number' => $orderNumber,
             ];
+            
         } catch (Exception $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -188,6 +315,7 @@ if (empty($sessionId) && !empty($paymentId) && !empty($referenceNo)) {
     $referenceNo = $payment['reference_no'];
     $paymentId = $payment['payment_id'] ?? '';
 }
+
 
 $_title = 'Payment Successful - SB Online';
 include '../sb_head.php';
@@ -260,6 +388,50 @@ include '../sb_head.php';
             font-size: 1rem;
             color: #7f8c8d;
             margin-bottom: 2rem;
+        }
+
+      
+        .points-reward {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1rem 0 2rem;
+            text-align: center;
+            animation: fadeIn 0.8s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .points-badge {
+            background: gold;
+            color: #333;
+            padding: 0.5rem 1.5rem;
+            border-radius: 20px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .points-reward h3 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.3rem;
+        }
+
+        .points-reward p {
+            margin: 0;
+            font-size: 0.95rem;
+            opacity: 0.9;
         }
 
         .payment-details {
@@ -342,6 +514,16 @@ include '../sb_head.php';
             color: white;
         }
 
+        .btn-rewards {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+        }
+
+        .btn-rewards:hover {
+            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+        }
+
         @media (max-width: 640px) {
             .success-card {
                 padding: 2rem 1.5rem;
@@ -366,11 +548,29 @@ include '../sb_head.php';
             <h1>Payment Successful!</h1>
             <p class="subtitle">Thank you for your purchase. Your order has been confirmed.</p>
 
+            <?php if ($pointsEarned > 0): ?>
+      
+                <div class="points-reward">
+                    <h3>🎉 Points Earned!</h3>
+                    <div class="points-badge">+<?= $pointsEarned ?> Points</div>
+                    <p>New balance: <?= $newPointsBalance ?> points</p>
+                    <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">
+                        Redeem your points for discounts and rewards!
+                    </p>
+                </div>
+            <?php endif; ?>
+
             <div class="payment-details">
                 <div class="detail-row">
                     <span class="detail-label">Reference Number</span>
                     <span class="detail-value"><?= htmlspecialchars($referenceNo) ?></span>
                 </div>
+                <?php if (isset($payment['order_number'])): ?>
+                <div class="detail-row">
+                    <span class="detail-label">Order Number</span>
+                    <span class="detail-value"><?= htmlspecialchars($payment['order_number']) ?></span>
+                </div>
+                <?php endif; ?>
                 <div class="detail-row">
                     <span class="detail-label">Payment Method</span>
                     <span class="detail-value"><?= htmlspecialchars($payment['method']) ?></span>
@@ -391,6 +591,9 @@ include '../sb_head.php';
 
             <div class="action-buttons">
                 <a href="/index.php" class="btn btn-primary">Continue Shopping</a>
+                <?php if ($pointsEarned > 0): ?>
+                    <a href="/page/rewards_shop.php" class="btn btn-rewards">Redeem Points</a>
+                <?php endif; ?>
                 <a href="cart_view.php" class="btn btn-secondary">View Cart</a>
             </div>
         </div>
