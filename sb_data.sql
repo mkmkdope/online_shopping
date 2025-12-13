@@ -387,3 +387,130 @@ INSERT INTO users (username, email, password_hash, user_role) VALUES
 INSERT INTO users (username, email, password_hash, user_role) VALUES
 ('user1', 'user1@example.com', 'user123', 'user'),
 ('member1', 'member1@example.com', 'member123', 'member');
+
+
+
+
+
+
+
+
+
+
+CREATE TABLE `reward_points` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `total_points` int(11) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `reward_point_transactions` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `points` int(11) NOT NULL,
+  `transaction_type` enum('earn','redeem','adjust') NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `reward_redemptions` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `points_used` int(11) NOT NULL,
+  `reward_name` varchar(255) NOT NULL,
+  `status` enum('pending','completed','cancelled') DEFAULT 'completed',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `reward_rules` (
+  `id` int(11) NOT NULL,
+  `rule_name` varchar(100) NOT NULL,
+  `points_per_amount` decimal(5,2) NOT NULL COMMENT 'Points per RM1',
+  `min_spend` decimal(10,2) DEFAULT 0.00,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `user_roles` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT '["all"]',
+  `description` text DEFAULT NULL,
+  `priority` int(11) DEFAULT 10,
+  `max_points_per_order` int(11) DEFAULT 0,
+  `applies_to_discounted_items` tinyint(1) DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Indexes for table `reward_points`
+--
+ALTER TABLE `reward_points`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `user_id` (`user_id`);
+
+--
+-- Indexes for table `reward_point_transactions`
+--
+ALTER TABLE `reward_point_transactions`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_user_id` (`user_id`);
+
+--
+-- Indexes for table `reward_redemptions`
+--
+ALTER TABLE `reward_redemptions`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`);
+
+--
+-- Indexes for table `reward_rules`
+--
+ALTER TABLE `reward_rules`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table `reward_points`
+--
+ALTER TABLE `reward_points`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `reward_point_transactions`
+--
+ALTER TABLE `reward_point_transactions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `reward_redemptions`
+--
+ALTER TABLE `reward_redemptions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `reward_rules`
+--
+ALTER TABLE `reward_rules`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `reward_points`
+--
+ALTER TABLE `reward_points`
+  ADD CONSTRAINT `reward_points_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `reward_point_transactions`
+--
+ALTER TABLE `reward_point_transactions`
+  ADD CONSTRAINT `reward_point_transactions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `reward_redemptions`
+--
+ALTER TABLE `reward_redemptions`
+  ADD CONSTRAINT `reward_redemptions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+COMMIT;
+
